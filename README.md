@@ -2,12 +2,12 @@
 
 # 🛡️ SentinelAC — Next-Gen Universal Anticheat Engine
 
-**An enterprise-grade, 0-Lag, 1:1 server-side physics simulation anticheat engine for Minecraft 1.20 – 26.x.**  
+**An enterprise-grade, 0-Lag, 1:1 server-side physics simulation anticheat engine for Minecraft 1.16.5 – 26.x.**  
 *Engineered by **azicoo** for Paper, Purpur, and multi-threaded Folia servers.*
 
 [![GitHub Release](https://img.shields.io/badge/Release-v2.3.74--SENTINEL-FF416C?style=for-the-badge&logo=github)](https://github.com/dilmuratovv/SentinelAC)
 [![Java Version](https://img.shields.io/badge/Java-21%20%7C%2025%2B-blue?style=for-the-badge&logo=openjdk)](https://adoptium.net/)
-[![Minecraft Compatibility](https://img.shields.io/badge/Minecraft-1.20%20--%2026.x-10B981?style=for-the-badge&logo=minecraft)](https://papermc.io/)
+[![Minecraft Compatibility](https://img.shields.io/badge/Minecraft-1.16.5%20--%2026.x-10B981?style=for-the-badge&logo=minecraft)](https://papermc.io/)
 [![Platform](https://img.shields.io/badge/Platform-Paper%20%7C%20Purpur%20%7C%20Folia-orange?style=for-the-badge)](https://papermc.io/software/folia)
 [![Author](https://img.shields.io/badge/Author-azicoo-9333EA?style=for-the-badge)](https://github.com/dilmuratovv/SentinelAC)
 [![License](https://img.shields.io/badge/License-GPL--3.0-lightgrey?style=for-the-badge)](LICENSE)
@@ -81,7 +81,7 @@ Whether you run a high-traffic PvP Anarchy server, an SMP realm, or a competitiv
 ## 📥 Quick Start & Installation
 
 ### Requirements
-* **Server**: Paper, Purpur, or Folia **1.20 - 26.x** (Universal).
+* **Server**: Paper, Purpur, or Folia **1.16.5 – 26.x** (Universal).
 * **Java**: **Java 21** or **Java 25+** (64-bit recommended).
 * **RAM**: 0 MB extra overhead (designed for extreme low memory footprint).
 
