@@ -1,58 +1,111 @@
-name: Paper 26.2 build
+name: Version-specific Paper builds
 on:
   push:
-    branches: [main, 'codex/**']
+    branches: [main]
+    paths-ignore: ['**/*.md']
   pull_request:
+    paths-ignore: ['**/*.md']
   workflow_dispatch:
-    inputs:
-      smoke:
-        description: Run local Paper test servers (requires EULA acceptance below)
-        type: boolean
-        default: false
-      accept_eula:
-        description: I accept https://www.minecraft.net/eula for the temporary test servers
-        type: boolean
-        default: false
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
-  build:
+  matrix:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    outputs:
+      targets: ${{ steps.targets.outputs.targets }}
+      publish: ${{ steps.targets.outputs.publish }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - id: targets
+        shell: python
+        run: |
+          import json, os, subprocess
+          from pathlib import Path
+          entries = json.loads(Path('tools/server-matrix.json').read_text())['servers']
+          priority = ['26.3', '1.21', '26.1.1', '1.21.11']
+          entries.sort(key=lambda e: priority.index(e['version']) if e['version'] in priority else len(priority))
+          targets = {'include': [{'target': e['version'], 'java': str(e['java'])} for e in entries]}
+          changed = subprocess.check_output(['git', 'diff', '--name-only', 'HEAD^', 'HEAD'], text=True).splitlines()
+          publish = os.environ['GITHUB_EVENT_NAME'] == 'push' and os.environ['GITHUB_REF'] == 'refs/heads/main' and 'release.json' in changed
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('targets=' + json.dumps(targets) + '\n')
+              output.write('publish=' + str(publish).lower() + '\n')
+  verify:
+    needs: matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.matrix.outputs.targets) }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
           submodules: recursive
-      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: ${{ matrix.java }}
           cache: maven
-      - run: mvn -B -ntp clean verify
-      - run: python3 tools/verify_artifact.py plugin/target/SentinelAC-2.5.0-paper26.2.jar
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        if: github.event_name == 'workflow_dispatch' && inputs.smoke && inputs.accept_eula
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Optional local protocol and boot tests
-        if: github.event_name == 'workflow_dispatch' && inputs.smoke && inputs.accept_eula
+      - name: Compile and test the exact target
+        env:
+          TARGET: ${{ matrix.target }}
+        run: mvn -B -ntp -Ppaper-$TARGET clean verify
+      - name: Inspect target identity, resources and bytecode
+        env:
+          TARGET: ${{ matrix.target }}
+        run: python3 tools/verify_artifact.py "plugin/target/SentinelAC-2.6.0-paper$TARGET.jar"
+      - run: npm ci --prefix tools/client --no-audit --no-fund
+      - name: Verify isolated native and Via servers
+        env:
+          TARGET: ${{ matrix.target }}
+        run: python3 tools/smoke_target.py --target "$TARGET" --java "$JAVA_HOME/bin/java" --accept-eula --client-probes
+      - name: Collect the version-specific release candidate
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
-          npm ci --prefix tools/client
-          python3 tools/smoke_paper.py --accept-eula --client-probes --java "$JAVA_HOME/bin/java"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+          mkdir -p dist
+          cp "plugin/target/SentinelAC-2.6.0-paper$TARGET.jar" dist/
+          cp "target/matrix-smoke/$TARGET/verification.json" "dist/verification-paper$TARGET.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: SentinelAC-paper26.2
-          path: |
-            plugin/target/SentinelAC-2.5.0-paper26.2.jar
-            plugin/target/surefire-reports/*.txt
-            deployment/
-            README.md
-            docs/VALIDATION.md
-            LICENSE
+          name: SentinelAC-paper-${{ matrix.target }}
+          path: dist/
           if-no-files-found: error
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.smoke && inputs.accept_eula
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
         with:
-          name: paper-smoke-logs
-          path: target/smoke/**/smoke-output.log
+          name: validation-paper-${{ matrix.target }}
+          path: |
+            plugin/target/surefire-reports/*.txt
+            target/matrix-smoke/${{ matrix.target }}/**/smoke-output.log
+          if-no-files-found: warn
+  publish:
+    needs: [matrix, verify]
+    if: needs.matrix.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: SentinelAC-paper-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish only after every target passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/publish_release.py

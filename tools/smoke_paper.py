@@ -6,6 +6,7 @@ The process uses an offline temporary test world and optional Via plugins.
 """
 import argparse
 import os
+import json
 from pathlib import Path
 import queue
 import shutil
@@ -14,9 +15,14 @@ import subprocess
 import threading
 import time
 import urllib.parse
+import zipfile
 from download_test_dependencies import download
 
-def run_case(root, java, artifacts, sentinel, via, client_probes=False):
+def run_case(root, java, artifacts, sentinel, via, client_probes=False, target=None, shared_root=None):
+    if target is None:
+        with zipfile.ZipFile(sentinel) as jar:
+            metadata = dict(line.split('=', 1) for line in jar.read('sentinel-target.properties').decode().splitlines() if '=' in line)
+            target = metadata['minecraft.version']
     directory = root / ('via' if via else 'native')
     if directory.exists():
         shutil.rmtree(directory)
@@ -25,7 +31,7 @@ def run_case(root, java, artifacts, sentinel, via, client_probes=False):
     for path in [sentinel] + ([artifacts['viaversion'], artifacts['viabackwards']] if via else []):
         shutil.copy2(path, plugins / path.name)
     for name in ['cache', 'libraries']:
-        shared = root / ('shared-' + name)
+        shared = (shared_root or root) / ('shared-' + name)
         shared.mkdir(exist_ok=True)
         (directory / name).symlink_to(shared, target_is_directory=True)
     (directory / 'eula.txt').write_text('eula=true\n')
@@ -34,7 +40,8 @@ def run_case(root, java, artifacts, sentinel, via, client_probes=False):
         port = listener.getsockname()[1]
     (directory / 'server.properties').write_text(
         f'server-ip=127.0.0.1\nserver-port={port}\nonline-mode=false\n'
-        'enable-status=false\nmax-players=5\nview-distance=2\nsimulation-distance=2\n'
+        'white-list=false\nenforce-whitelist=false\n'
+        'enable-status=true\nmax-players=5\nview-distance=2\nsimulation-distance=2\n'
         'generate-structures=false\nlevel-type=minecraft:flat\nspawn-protection=0\n'
         'generator-settings={"biome":"minecraft:plains","layers":[{"block":"minecraft:bedrock","height":1},{"block":"minecraft:dirt","height":2},{"block":"minecraft:grass_block","height":1}]}\n')
     args = [java, '-Xms256M', '-Xmx1536M', '-Djavax.net.ssl.trustStore=' + os.environ.get('JAVA_TRUSTSTORE', java_truststore(java))]
@@ -81,13 +88,24 @@ def run_case(root, java, artifacts, sentinel, via, client_probes=False):
         config.write_text(original)
         command('sac reload')
         wait_for('Config has been reloaded.')
-        if via and client_probes:
-            result = subprocess.run(['node', str(Path(__file__).with_name('client') / 'probe.cjs'), str(port)],
+        native_protocol = None
+        if client_probes and not via:
+            resolved = subprocess.run(['node', str(Path(__file__).with_name('client') / 'native_protocol.cjs'), str(port)], text=True, capture_output=True, timeout=12)
+            if resolved.returncode:
+                raise RuntimeError('Native protocol discovery failed: ' + resolved.stderr)
+            native_protocol = json.loads(resolved.stdout)
+            if target.startswith('1.21') and native_protocol['client'] is None:
+                raise RuntimeError('No test codec for native legacy protocol: ' + str(native_protocol))
+            print('Native protocol coverage: ' + json.dumps(native_protocol), flush=True)
+        if client_probes and (via or native_protocol and native_protocol['client']):
+            clients = '1.21.11,26.1' if via else native_protocol['client']
+            movement_client = '26.1' if via else native_protocol['client']
+            result = subprocess.run(['node', str(Path(__file__).with_name('client') / 'probe.cjs'), str(port), clients],
                                     text=True, capture_output=True, timeout=100)
             print(result.stdout, end='', flush=True)
             if result.returncode:
                 raise RuntimeError('Protocol client checks failed: ' + result.stderr)
-            result = subprocess.run(['node', str(Path(__file__).with_name('client') / 'movement.cjs'), str(port)],
+            result = subprocess.run(['node', str(Path(__file__).with_name('client') / 'movement.cjs'), str(port), movement_client],
                                     text=True, capture_output=True, timeout=25)
             print(result.stdout, end='', flush=True)
             if result.returncode:
@@ -95,7 +113,8 @@ def run_case(root, java, artifacts, sentinel, via, client_probes=False):
             command('sac info')
             wait_for('Diagnostika: processed=')
             logs = '\n'.join(path.read_text() for path in (plugins / 'SentinelAC/logs').glob('violations.*.log'))
-            if 'MovementProbe' not in logs or 'Simulation' not in logs:
+            records = [line.split('\t') for line in logs.splitlines()]
+            if not any(len(record) >= 4 and record[2] == 'MovementProbe' and record[3] == 'Simulation' for record in records):
                 raise RuntimeError('Impossible movement did not produce a core Simulation finding')
         command('sac dump')
         wait_for('SentinelAC: diagnostic saved to ')
@@ -105,11 +124,12 @@ def run_case(root, java, artifacts, sentinel, via, client_probes=False):
         process.wait(timeout=40)
         if process.returncode != 0: raise RuntimeError('Server exit code ' + str(process.returncode))
         text = ''.join(captured)
-        if 'Sentinel ready: Paper 26.2' not in text or 'Sentinel startup failed' in text:
+        if 'Sentinel ready: Paper ' + target + ',' not in text or 'Sentinel startup failed' in text:
             raise RuntimeError('Sentinel did not become ready')
         if any(word in text for word in ['Failed to start ', 'Failed to load ', 'Failed to register commands']):
             raise RuntimeError('Engine initializer reported a failure')
-        print('PASS: ' + ('ViaVersion + ViaBackwards' if via else 'native') + ' startup/commands/reload', flush=True)
+        print('PASS: Paper ' + target + ' ' + ('ViaVersion + ViaBackwards' if via else 'native') + ' startup/commands/reload', flush=True)
+        return {'mode': 'via' if via else 'native', 'native_protocol': native_protocol, 'client_probes': client_probes and (via or bool(native_protocol and native_protocol['client']))}
     finally:
         if process.poll() is None:
             process.terminate()
@@ -126,7 +146,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--accept-eula', action='store_true')
     parser.add_argument('--java', default=shutil.which('java'))
-    parser.add_argument('--sentinel', type=Path, default=Path('plugin/target/SentinelAC-2.5.0-paper26.2.jar'))
+    parser.add_argument('--sentinel', type=Path, default=Path('plugin/target/SentinelAC-2.6.0-paper26.2.jar'))
     parser.add_argument('--mode', choices=['native', 'via', 'both'], default='both')
     parser.add_argument('--client-probes', action='store_true', help='Requires npm ci --prefix tools/client')
     args = parser.parse_args()

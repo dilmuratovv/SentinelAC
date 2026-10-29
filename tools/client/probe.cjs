@@ -26,6 +26,7 @@ async function probe(version, blacklist) {
     };
     client.on('kick_disconnect', kicked);
     client.on('disconnect', kicked);
+    client.on('ping', packet => client.write('pong', {id: packet.id}));
     client.on('position', packet => {
       if (packet.teleportId !== undefined) client.write('teleport_confirm', {teleportId: packet.teleportId});
     });
@@ -41,7 +42,7 @@ async function probe(version, blacklist) {
   console.log(`PASS: ${version} ${blacklist ? 'blacklisted channel kicked' : 'clean login and idle'}`);
 }
 (async () => {
-  for (const version of ['1.21.11', '26.1']) {
+  for (const version of (process.argv[3] ? process.argv[3].split(',') : ['1.21.11', '26.1'])) {
     assert(mc.supportedVersions.includes(version));
     await probe(version, false);
     await probe(version, true);

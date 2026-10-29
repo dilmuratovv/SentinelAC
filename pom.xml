@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>uz.sentinel.ac</groupId>
   <artifactId>sentinel-parent</artifactId>
-  <version>2.5.0-paper26.2</version>
+  <version>2.6.0</version>
   <packaging>pom</packaging>
   <name>SentinelAC standalone</name>
   <modules>
@@ -12,10 +12,149 @@
   </modules>
   <properties>
     <maven.compiler.release>25</maven.compiler.release>
+    <sentinel.target>26.2</sentinel.target>
+    <sentinel.api>26.2</sentinel.api>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.build.outputTimestamp>2026-10-29T00:00:00Z</project.build.outputTimestamp>
     <paper.version>26.2.build.135-stable</paper.version>
   </properties>
+  <profiles>
+    <profile>
+      <id>paper-1.21</id>
+      <properties>
+        <sentinel.target>1.21</sentinel.target>
+        <sentinel.api>1.21</sentinel.api>
+        <maven.compiler.release>21</maven.compiler.release>
+        <paper.version>1.21-R0.1-SNAPSHOT</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-1.21.1</id>
+      <properties>
+        <sentinel.target>1.21.1</sentinel.target>
+        <sentinel.api>1.21.1</sentinel.api>
+        <maven.compiler.release>21</maven.compiler.release>
+        <paper.version>1.21.1-R0.1-SNAPSHOT</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-1.21.3</id>
+      <properties>
+        <sentinel.target>1.21.3</sentinel.target>
+        <sentinel.api>1.21.3</sentinel.api>
+        <maven.compiler.release>21</maven.compiler.release>
+        <paper.version>1.21.3-R0.1-SNAPSHOT</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-1.21.4</id>
+      <properties>
+        <sentinel.target>1.21.4</sentinel.target>
+        <sentinel.api>1.21.4</sentinel.api>
+        <maven.compiler.release>21</maven.compiler.release>
+        <paper.version>1.21.4-R0.1-SNAPSHOT</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-1.21.5</id>
+      <properties>
+        <sentinel.target>1.21.5</sentinel.target>
+        <sentinel.api>1.21.5</sentinel.api>
+        <maven.compiler.release>21</maven.compiler.release>
+        <paper.version>1.21.5-R0.1-SNAPSHOT</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-1.21.6</id>
+      <properties>
+        <sentinel.target>1.21.6</sentinel.target>
+        <sentinel.api>1.21.6</sentinel.api>
+        <maven.compiler.release>21</maven.compiler.release>
+        <paper.version>1.21.6-R0.1-SNAPSHOT</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-1.21.7</id>
+      <properties>
+        <sentinel.target>1.21.7</sentinel.target>
+        <sentinel.api>1.21.7</sentinel.api>
+        <maven.compiler.release>21</maven.compiler.release>
+        <paper.version>1.21.7-R0.1-SNAPSHOT</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-1.21.8</id>
+      <properties>
+        <sentinel.target>1.21.8</sentinel.target>
+        <sentinel.api>1.21.8</sentinel.api>
+        <maven.compiler.release>21</maven.compiler.release>
+        <paper.version>1.21.8-R0.1-SNAPSHOT</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-1.21.9</id>
+      <properties>
+        <sentinel.target>1.21.9</sentinel.target>
+        <sentinel.api>1.21.9</sentinel.api>
+        <maven.compiler.release>21</maven.compiler.release>
+        <paper.version>1.21.9-R0.1-SNAPSHOT</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-1.21.10</id>
+      <properties>
+        <sentinel.target>1.21.10</sentinel.target>
+        <sentinel.api>1.21.10</sentinel.api>
+        <maven.compiler.release>21</maven.compiler.release>
+        <paper.version>1.21.10-R0.1-SNAPSHOT</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-1.21.11</id>
+      <properties>
+        <sentinel.target>1.21.11</sentinel.target>
+        <sentinel.api>1.21.11</sentinel.api>
+        <maven.compiler.release>21</maven.compiler.release>
+        <paper.version>1.21.11-R0.1-SNAPSHOT</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-26.1.1</id>
+      <properties>
+        <sentinel.target>26.1.1</sentinel.target>
+        <sentinel.api>26.1.1</sentinel.api>
+        <maven.compiler.release>25</maven.compiler.release>
+        <paper.version>26.1.1.build.29-alpha</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-26.1.2</id>
+      <properties>
+        <sentinel.target>26.1.2</sentinel.target>
+        <sentinel.api>26.1.2</sentinel.api>
+        <maven.compiler.release>25</maven.compiler.release>
+        <paper.version>26.1.2.build.74-stable</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-26.2</id>
+      <properties>
+        <sentinel.target>26.2</sentinel.target>
+        <sentinel.api>26.2</sentinel.api>
+        <maven.compiler.release>25</maven.compiler.release>
+        <paper.version>26.2.build.135-stable</paper.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>paper-26.3</id>
+      <properties>
+        <sentinel.target>26.3</sentinel.target>
+        <sentinel.api>26.3</sentinel.api>
+        <maven.compiler.release>25</maven.compiler.release>
+        <paper.version>26.3.build.230-stable</paper.version>
+      </properties>
+    </profile>
+  </profiles>
   <repositories>
     <repository>
       <id>central</id>
@@ -31,7 +170,7 @@
     </repository>
     <repository>
       <id>papi</id>
-      <url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url>
+      <url>https://repo.helpch.at/releases/</url>
     </repository>
     <repository>
       <id>opencollab-release</id>
