@@ -1,0 +1,56 @@
+name: Remove legacy release and build archives
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/cleanup-legacy.yml]
+permissions:
+  contents: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Remove verified legacy objects
+        shell: python
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          import json, os, urllib.request, urllib.error
+          base = 'https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY']
+          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
+          def api(method, path):
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(base+path, headers=headers, method=method), timeout=60) as r:
+                      data=r.read()
+                      return json.loads(data) if data else None
+              except urllib.error.HTTPError as e:
+                  if e.code == 404: return None
+                  raise
+          latest=api('GET','/releases/tags/v2.5.0-paper26.2')
+          assert latest and not latest['draft']
+          jar=next(a for a in latest['assets'] if a['name']=='SentinelAC-2.5.0-paper26.2.jar')
+          assert jar['digest']=='sha256:744a4d5d19722f228be9a90ac18f9bd626f0c98fbffd10100fc2071aef29bcfb'
+          old=api('GET','/releases/427179039')
+          if old:
+              assert old['tag_name']=='v2.3.74-SENTINEL'
+              api('DELETE','/releases/427179039')
+              print('Deleted legacy release and its two assets')
+          tag=api('GET','/git/ref/tags/v2.3.74-SENTINEL')
+          if tag:
+              assert tag['object']['sha']=='d698709f3b0b8bacac2fcea7448d25e80c0d60a0'
+              api('DELETE','/git/refs/tags/v2.3.74-SENTINEL')
+              print('Deleted legacy tag')
+          targets=json.loads("[{\"id\":12931230525,\"name\":\"SentinelAC-paper26.2\",\"sha\":\"ead18a4a1f4b4427eb55be7725863f393e27056c\"},{\"id\":12917431226,\"name\":\"SentinelAC-paper26.2\",\"sha\":\"d35c1b62a753c37fe1900ace5d483cd1cc3587d8\"},{\"id\":12916019138,\"name\":\"SentinelAC-paper26.2\",\"sha\":\"dbfaf554fa3bb0c5cf1ac48a08d16755e2d9521c\"},{\"id\":12915531392,\"name\":\"SentinelAC-paper26.2\",\"sha\":\"1af2ce55480b789c3e23886d73e5150d74154474\"},{\"id\":12914163761,\"name\":\"SentinelAC-paper26.2\",\"sha\":\"1af2ce55480b789c3e23886d73e5150d74154474\"},{\"id\":12911700183,\"name\":\"SentinelAC-paper26.2\",\"sha\":\"9e6c6033d0102befed8e9bd64f1ec60aaa3408f7\"},{\"id\":12910856178,\"name\":\"SentinelAC-paper26.2\",\"sha\":\"9e6c6033d0102befed8e9bd64f1ec60aaa3408f7\"}]")
+          for target in targets:
+              path='/actions/artifacts/'+str(target['id'])
+              artifact=api('GET',path)
+              if artifact:
+                  assert artifact['name']==target['name']
+                  assert artifact['workflow_run']['head_sha']==target['sha']
+                  api('DELETE',path)
+                  print('Deleted old build archive',target['id'])
+          print('Cleanup complete; current release preserved')
+          
