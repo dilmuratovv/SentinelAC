@@ -29,7 +29,7 @@ public final class SentinelCommand implements CommandExecutor, TabCompleter {
                 }
                 case "info", "stats" -> {
                     if (!permission(sender, "info")) return true;
-                    send(sender, "Sentinel " + plugin.getPluginMeta().getVersion() + " | Paper 26.2 | Engine " + plugin.engine().version());
+                    send(sender, "Sentinel " + plugin.getPluginMeta().getVersion() + " | Paper " + Bukkit.getMinecraftVersion() + " | Engine " + plugin.engine().version());
                     send(sender, "ViaVersion: " + Bukkit.getPluginManager().isPluginEnabled("ViaVersion")
                             + " | ViaBackwards: " + Bukkit.getPluginManager().isPluginEnabled("ViaBackwards"));
                     send(sender, "Channel policy=" + plugin.settings().modEnabled() + ", kick=" + plugin.settings().kickOnChannel()

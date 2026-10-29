@@ -19,9 +19,9 @@ A Minecraft anticheat project by **azicoo**, built around server-side prediction
 
 ## About
 
-SentinelAC combines a prediction-based anticheat engine with server policy controls and bounded diagnostics in **one plugin JAR**. Movement, combat, packet behavior, and server rules are managed through a shared lifecycle and the `/sac` command tree.
+SentinelAC combines a prediction-based anticheat engine with server policy controls and bounded diagnostics. **Each Paper server version has its own standalone JAR**, with its exact target checked at startup. Movement, combat, packet behavior, and server rules are managed through a shared lifecycle and the `/sac` command tree.
 
-The project is being developed for **multiple Minecraft versions**. Support will expand through dedicated compatibility work and testing; use each release's compatibility information when choosing a build.
+Version-specific builds cover the published Paper targets in the compatibility table below. Choose the file matching your server version; the engine is included in each build.
 
 **Created and maintained by azicoo.**
 
@@ -89,20 +89,31 @@ For protocol translation, install the compatible **ViaVersion and ViaBackwards p
 
 ## Compatibility
 
-SentinelAC's roadmap covers multiple Minecraft versions. **Compatibility is established per release, rather than assumed across every version.**
+Release **2.6.0** provides separate builds for these exact targets. Each goes through its own API compilation, unit tests, artifact inspection and native/Via server probes before publication.
 
-| Component | Current published build |
-|---|---|
-| Release | [2.5.0-paper26.2](https://github.com/dilmuratovv/SentinelAC/releases/tag/v2.5.0-paper26.2) |
-| Server | Paper 26.2 |
-| Java | 25 |
-| Translation plugins tested | ViaVersion 5.12.2 + ViaBackwards 5.12.2 |
-| Translated clients exercised | 1.21.11 and 26.1 |
-| Additional server versions | Planned; implementation and validation will follow. |
+| Paper version | JAR filename | Java | Paper build/channel |
+|---|---|---|---|
+| 1.21 | `SentinelAC-2.6.0-paper1.21.jar` | 21 | 130 (STABLE) |
+| 1.21.1 | `SentinelAC-2.6.0-paper1.21.1.jar` | 21 | 133 (STABLE) |
+| 1.21.3 | `SentinelAC-2.6.0-paper1.21.3.jar` | 21 | 83 (STABLE) |
+| 1.21.4 | `SentinelAC-2.6.0-paper1.21.4.jar` | 21 | 232 (STABLE) |
+| 1.21.5 | `SentinelAC-2.6.0-paper1.21.5.jar` | 21 | 114 (ALPHA) |
+| 1.21.6 | `SentinelAC-2.6.0-paper1.21.6.jar` | 21 | 48 (STABLE) |
+| 1.21.7 | `SentinelAC-2.6.0-paper1.21.7.jar` | 21 | 32 (STABLE) |
+| 1.21.8 | `SentinelAC-2.6.0-paper1.21.8.jar` | 21 | 60 (STABLE) |
+| 1.21.9 | `SentinelAC-2.6.0-paper1.21.9.jar` | 21 | 59 (ALPHA) |
+| 1.21.10 | `SentinelAC-2.6.0-paper1.21.10.jar` | 21 | 130 (STABLE) |
+| 1.21.11 | `SentinelAC-2.6.0-paper1.21.11.jar` | 21 | 132 (STABLE) |
+| 26.1.1 | `SentinelAC-2.6.0-paper26.1.1.jar` | 25 | 29 (ALPHA) |
+| 26.1.2 | `SentinelAC-2.6.0-paper26.1.2.jar` | 25 | 74 (STABLE) |
+| 26.2 | `SentinelAC-2.6.0-paper26.2.jar` | 25 | 135 (STABLE) |
+| 26.3 | `SentinelAC-2.6.0-paper26.3.jar` | 25 | 230 (STABLE) |
 
-Translated-client login and enforcement probes do not certify every gameplay mechanic. Older-client vehicle behavior remains subject to the documented ViaBackwards limitations. Other server versions and Folia are not certified by the current release.
+**Unavailable names:** Paper has no published 1.21.2 or exactly 26.1 server build. The 26.1 line is covered through its published 26.1.1 and 26.1.2 versions. ALPHA labels above describe the official Paper builds and are not a claim of Paper stability.
 
-See [Validation](docs/VALIDATION.md) for the exact test coverage and remaining staging work.
+ViaVersion/ViaBackwards 5.12.2 are used in the translation tests. Native wire-protocol tests run where a matching client codec is available; full gameplay compatibility is not inferred from login and enforcement probes. Other server versions and Folia are outside this matrix.
+
+See [Validation](docs/VALIDATION.md) and the release's `VERIFICATION.json` for exact coverage and staging limits.
 
 ## Configuration & enforcement
 
@@ -116,17 +127,17 @@ Test new builds and punishment thresholds on a staging server with your plugin s
 
 ## Build from source
 
-For the current branch, use **JDK 25**, **Maven 3.9+**, **Python 3**, and **Git**.
+Use **Maven 3.9+**, **Python 3**, and **Git**. Select **JDK 21** for a 1.21.x profile or **JDK 25** for a 26.x profile. Each profile pins the matching Paper API and target metadata.
 
 ```sh
 git clone --recurse-submodules https://github.com/dilmuratovv/SentinelAC.git
 cd SentinelAC
 git submodule update --init --recursive
-mvn -B -ntp clean verify
-python3 tools/verify_artifact.py
+mvn -B -ntp -Ppaper-1.21.11 clean verify
+python3 tools/verify_artifact.py plugin/target/SentinelAC-2.6.0-paper1.21.11.jar
 ```
 
-The plugin JAR is produced in `plugin/target/`. Choose the JAR named `SentinelAC-<version>.jar`.
+Replace `paper-1.21.11` with the required profile, such as `paper-26.3`. Output: `plugin/target/SentinelAC-2.6.0-paper<VERSION>.jar`. The default profile targets Paper 26.2. Never install multiple Sentinel builds on the same server.
 
 <details>
 <summary><strong>Build architecture</strong></summary>
@@ -137,7 +148,7 @@ The plugin JAR is produced in `plugin/target/`. Choose the JAR named `SentinelAC
 - `runtime/` extracts third-party libraries and protocol assets from a hash-verified distribution. Engine/API bytecode and the source-built shim are excluded from that carrier.
 - Artifact verification checks required resources, codec metadata, core bytecode, duplicate entries, legal notices, and active branding.
 
-The current release passed **76 automated tests**, artifact verification, and localhost server/protocol probes. The ray arithmetic change is checked against the original over 25,000 random cases and boundary cases; this is not a claim of measured global TPS improvement.
+The release pipeline requires **77 automated tests per target**, artifact verification, and localhost server/protocol probes for every asset before publication. The ray arithmetic change is checked against the original over 25,000 random cases and boundary cases; this is not a claim of measured global TPS improvement.
 
 </details>
 
@@ -145,7 +156,7 @@ Optional localhost smoke tests:
 
 ```sh
 npm ci --prefix tools/client
-python3 tools/smoke_paper.py --accept-eula --client-probes --java /path/to/jdk-25/bin/java
+python3 tools/smoke_target.py --target 1.21.11 --accept-eula --client-probes --java /path/to/jdk-21/bin/java
 ```
 
 Pass `--accept-eula` only after accepting the [Minecraft EULA](https://www.minecraft.net/eula). These tests use temporary localhost servers, not a production server.
@@ -156,7 +167,8 @@ Pass `--accept-eula` only after accepting the [Minecraft EULA](https://www.minec
 - [x] Unify commands, permissions, and active branding.
 - [x] Add bounded diagnostics, webhook handling, and automated release verification.
 - [x] Publish the first source-buildable server target.
-- [ ] Add and validate further Minecraft server versions.
+- [x] Add independent build profiles and a gated server-test matrix for the published 1.21.x and 26.x targets.
+- [ ] Extend coverage as further Paper versions become available.
 - [ ] Expand client-version and gameplay compatibility testing.
 - [ ] Profile sustained load and test against a broader controlled cheat-client suite.
 

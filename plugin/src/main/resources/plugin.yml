@@ -1,10 +1,10 @@
 name: SentinelAC
-version: '${project.version}'
+version: '${project.version}-paper${sentinel.target}'
 main: uz.sentinel.ac.SentinelPlugin
-description: Standalone prediction anticheat and server policies for Paper 26.2
+description: Standalone prediction anticheat and server policies for supported Paper servers
 authors: [azicoo]
 website: https://github.com/dilmuratovv/SentinelAC
-api-version: '26.2'
+api-version: '${sentinel.api}'
 softdepend: [ProtocolLib, ProtocolSupport, Essentials, ViaVersion, ViaBackwards, ViaRewind, Geyser-Spigot, floodgate, FastLogin, PlaceholderAPI, LuckPerms, sqlite-jdbc, mysql-jdbc, postgresql-jdbc, mongodb-driver, jedis]
 permissions:
   sentinel.admin:

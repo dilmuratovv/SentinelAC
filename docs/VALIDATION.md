@@ -1,58 +1,53 @@
-# SentinelAC 2.5.0 — validation
+# SentinelAC 2.6.0 validation matrix
 
-Test date: **2026-10-29**. Target: **Paper 26.2 build 135**, **Java 25**. This report describes the standalone source build, with no separate anticheat engine plugin installed.
+Each Paper version gets an independently compiled, labelled and tested JAR. Publication is gated on success of the entire matrix; a failed target prevents the release job from running.
 
-## Build and artifact
+## Pinned server targets
 
-- `mvn clean verify`: **76 tests passed; 0 failures, errors or skips**, across 19 suites. This includes 48 pinned upstream regression tests and 28 Sentinel tests.
-- All 949 engine/API source files are generated from pinned source submodules and compiled, alongside Sentinel sources. The final archive has 1,334 non-library core classes, including compiler-generated nested classes.
-- SHA256: `744a4d5d19722f228be9a90ac18f9bd626f0c98fbffd10100fc2071aef29bcfb`.
-- `tools/verify_artifact.py` passes: standalone loader, bundled PacketEvents, Java 25 core bytecode, no old engine/server classes, no duplicate archive entries, all five backend defaults, codec metadata and original legal notices.
-- Classfile UTF8 constants, resource contents and archive paths have no old branding outside legal notices. The eight FastUtil serialized-lambda descriptor strings missed by ordinary Shade relocation are corrected, with classfile lengths preserved.
-- The third-party carrier's SLF4J copyright/license is retained separately from the plugin GPL license. The upstream compatibility shim is excluded from the carrier and compiled from source.
+| Paper version | Artifact | Java | Paper build/channel |
+|---|---|---|---|
+| 1.21 | `SentinelAC-2.6.0-paper1.21.jar` | 21 | 130 (STABLE) |
+| 1.21.1 | `SentinelAC-2.6.0-paper1.21.1.jar` | 21 | 133 (STABLE) |
+| 1.21.3 | `SentinelAC-2.6.0-paper1.21.3.jar` | 21 | 83 (STABLE) |
+| 1.21.4 | `SentinelAC-2.6.0-paper1.21.4.jar` | 21 | 232 (STABLE) |
+| 1.21.5 | `SentinelAC-2.6.0-paper1.21.5.jar` | 21 | 114 (ALPHA) |
+| 1.21.6 | `SentinelAC-2.6.0-paper1.21.6.jar` | 21 | 48 (STABLE) |
+| 1.21.7 | `SentinelAC-2.6.0-paper1.21.7.jar` | 21 | 32 (STABLE) |
+| 1.21.8 | `SentinelAC-2.6.0-paper1.21.8.jar` | 21 | 60 (STABLE) |
+| 1.21.9 | `SentinelAC-2.6.0-paper1.21.9.jar` | 21 | 59 (ALPHA) |
+| 1.21.10 | `SentinelAC-2.6.0-paper1.21.10.jar` | 21 | 130 (STABLE) |
+| 1.21.11 | `SentinelAC-2.6.0-paper1.21.11.jar` | 21 | 132 (STABLE) |
+| 26.1.1 | `SentinelAC-2.6.0-paper26.1.1.jar` | 25 | 29 (ALPHA) |
+| 26.1.2 | `SentinelAC-2.6.0-paper26.1.2.jar` | 25 | 74 (STABLE) |
+| 26.2 | `SentinelAC-2.6.0-paper26.2.jar` | 25 | 135 (STABLE) |
+| 26.3 | `SentinelAC-2.6.0-paper26.3.jar` | 25 | 230 (STABLE) |
 
-Source pins and library carrier checksum are documented in README and `tools/test-dependencies.json`. Raw upstream sources and their licenses remain in submodules.
+The download URLs and SHA256 values are pinned in `tools/server-matrix.json`. Requested names without published Paper builds, 1.21.2 and 26.1, are listed there as unavailable. The 26.1 line is tested using its published 26.1.1/26.1.2 server versions. ALPHA labels above belong to Paper and remain disclosed.
 
-## Automated regression coverage
+## Per-target checks
 
-Sentinel tests cover immutable exact-channel/namespace matching, invalid configuration rejection, monotonic sliding windows and burst boundaries, shared offhand/main-hand crystal limits, respawn-anchor charging distinction, delayed kicks with policy/exemption rechecks, finite recent history, log sanitation, permission checks, and preserving cancelled public API flags.
+- Compile against the target's Paper API, using Java 21 for 1.21.x and Java 25 for 26.x.
+- Run all 77 unit/regression tests, including the embedded target guard test.
+- Verify exact filename, plugin version, API version and target metadata; verify core bytecode and that no bundled class requires a newer JVM than the target.
+- Check engine/API classes, all backend templates, codec metadata, legal notices, duplicate entries and active branding.
+- Start the exact hash-pinned Paper build on an isolated offline localhost world, first alone and then with ViaVersion/ViaBackwards 5.12.2.
+- Check readiness, all root command aliases/help, valid reload, invalid-policy rejection and recovery, SQLite, local dump and prediction timing.
+- Resolve the server's native wire-protocol number. Where the pinned client library has an exact codec match, exercise native clean login/idle, blacklist-channel kick and impossible upward movement with a Simulation audit finding and correction. Patch versions sharing a protocol may use the same codec; the resolved codec is recorded.
+- Exercise translated 1.21.11 and 26.1 clients on every Via server, including the blacklist probes, and run the movement probe through the 26.1 client.
+- Confirm orderly shutdown and save both server logs.
 
-The changed ray arithmetic is compared bit-for-bit with the pinned original over **25,000 random rays/boxes** and signed-zero, parallel, inside-origin and boundary cases. This verifies the scoped arithmetic change; it does not establish an improvement in global TPS. The JVM may already eliminate some original allocations.
+The client library is pinned to minecraft-protocol 1.68.0. Its newest codec is 26.1. Native modern gameplay is not claimed when no exact protocol match exists; native server startup/commands and translated probes still run. Test reports distinguish those cases.
 
-Webhook tests exercise queue overflow, network failures, missing rate-limit headers, the three-attempt limit, one in-flight request, expiry and shutdown completion. No external webhook was sent. Existing upstream tests cover session continuity/publication, lease ownership, heartbeat scheduling, reconnect/recovery and verbose schemas.
+## Tests and output
 
-## Live localhost Paper tests
+There are 77 tests per target (1,155 across a successful 15-target run). These cover pinned upstream datastore concurrency/ownership/recovery and verbose schemas, plus Sentinel policies, queues, permissions, configuration, ray arithmetic and exact-target packaging. They are not a comprehensive cheat-client corpus.
 
-The smoke harness ran temporary **offline-mode, localhost-only** flat worlds. Test JARs were hash verified. Native case: only SentinelAC. Via case: SentinelAC, ViaVersion **5.12.2**, ViaBackwards **5.12.2**.
+The changed ray arithmetic is compared with the original over 25,000 random cases plus boundary cases. No global TPS improvement is inferred from that comparison. Webhook behavior uses mocks; external Discord delivery and external MySQL/PostgreSQL/MongoDB/Redis integration are not certified by these tests.
 
-Both cases passed:
+CI uploads `verification-paper<VERSION>.json`, the target JAR, unit-test output and native/Via smoke logs. The release aggregates the reports as `VERIFICATION.json` and includes `SHA256SUMS.txt`. These reports identify the actual checked artifact and coverage; consult them together with the successful GitHub Actions run.
 
-- Startup and `Sentinel ready: Paper 26.2`; no engine initialization/command registration failure.
-- `/sac info`, `/sentinelac version`, `/sentinel help`, and the custom help entries.
-- Valid reload, rejection of crystal limit `0`, then recovery with valid configuration.
-- Local `/sac dump` file creation and `/sac perf` output.
-- SQLite initialization/reload and orderly shutdown.
+## Remaining limits
 
-Via client probes passed:
+Full gameplay sessions, vehicles/elytra/PvP, unusual physics changes from other plugins, high ping/low TPS and sustained high-online profiling require staging tests. ViaBackwards vehicle limitations remain. Channel blacklisting observes advertised channels and cannot enumerate every hidden mod. Rate policies are server rules rather than standalone proof of cheating; the optional kick profile needs calibration.
 
-| Client | Probe | Result |
-|---|---|---|
-| 1.21.11 | Login and 2.5 seconds idle | Stayed connected |
-| 1.21.11 | Register `baritone:channel` | Kicked with the matching rule |
-| 26.1 | Login and 2.5 seconds idle | Stayed connected |
-| 26.1 | Register `baritone:channel` | Kicked with the matching rule |
-| 26.1 | Impossible upward movement | Server correction and an actual core `Simulation` audit finding |
-
-The movement probe answers transaction pings, acknowledges teleports and sends movement/tick-end packets. The harness requires a `Simulation` finding as well as a correction, since a vanilla teleport alone would not prove the engine acted.
-
-Logs are produced at `target/smoke/native/smoke-output.log` and `target/smoke/via/smoke-output.log`. Test-environment network warnings from Mojang public-key requests and optional server/plugin update requests were observed; online authentication was not tested.
-
-## Limits and staging work
-
-`minecraft-protocol` 1.68.0 provides 26.1 and 1.21.11, but no native 26.2 game client. Native 26.2 **server boot/commands** were tested, not a complete native player session. The probes do not simulate normal gameplay physics comprehensively or certify zero false positives.
-
-Upstream's warning about ViaBackwards vehicle support on 1.21.2+ servers remains. Older client versions, native 26.2 gameplay, vehicles, elytra, knockback/PvP, low TPS/high ping and interactions with the actual server plugin set need staging playtests. High-online CPU/heap profiling and controlled cheat-client tests have not been performed; no zero-lag or universal detection guarantee is made.
-
-Only SQLite was exercised live. MySQL/PostgreSQL/MongoDB/Redis templates are present, but those external backends and their optional driver plugins were not integration tested. Discord delivery was tested with mocks only. The optional kick punishment profile is not a universally calibrated enforcement policy and is not installed automatically.
-
-Channel blacklisting observes advertised plugin channels; clients can hide them. It cannot enumerate every installed mod or detect every client-only ESP/X-ray. Existing history databases/configurations from old modified binaries are not automatically certified for migration. Back up and compare them before adoption.
+The earlier single-target release's evidence is retained in [VALIDATION-2.5.0.md](VALIDATION-2.5.0.md).
