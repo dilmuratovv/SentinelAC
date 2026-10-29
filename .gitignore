@@ -18,3 +18,9 @@ node_modules/
 __pycache__/
 *.py[cod]
 
+
+# Per-version release candidates
+/dist/
+/release-assets/
+/SHA256SUMS.txt
+/VERIFICATION.json

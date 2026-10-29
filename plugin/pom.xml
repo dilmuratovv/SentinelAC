@@ -4,11 +4,16 @@
   <parent>
     <groupId>uz.sentinel.ac</groupId>
     <artifactId>sentinel-parent</artifactId>
-    <version>2.5.0-paper26.2</version>
+    <version>2.6.0</version>
   </parent>
   <artifactId>SentinelAC</artifactId>
   <dependencies>
-    <dependency><groupId>org.apiguardian</groupId><artifactId>apiguardian-api</artifactId><version>1.1.2</version><scope>provided</scope></dependency>
+    <dependency>
+      <groupId>org.apiguardian</groupId>
+      <artifactId>apiguardian-api</artifactId>
+      <version>1.1.2</version>
+      <scope>provided</scope>
+    </dependency>
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-transport</artifactId>
@@ -119,6 +124,7 @@
     </dependency>
   </dependencies>
   <build>
+    <finalName>SentinelAC-${project.version}-paper${sentinel.target}</finalName>
     <resources>
       <resource>
         <directory>src/main/resources</directory>
@@ -144,18 +150,24 @@
               <executable>python3</executable>
               <arguments>
                 <argument>${project.basedir}/../tools/generate_engine.py</argument>
+                <argument>${sentinel.target}</argument>
+                <argument>${project.version}</argument>
+                <argument>${maven.compiler.release}</argument>
               </arguments>
             </configuration>
           </execution>
           <execution>
             <id>codec-metadata</id>
             <phase>process-classes</phase>
-            <goals><goal>exec</goal></goals>
+            <goals>
+              <goal>exec</goal>
+            </goals>
             <configuration>
               <executable>${java.home}/bin/java</executable>
               <classpathScope>compile</classpathScope>
               <arguments>
-                <argument>-cp</argument><classpath/>
+                <argument>-cp</argument>
+                <classpath/>
                 <argument>uz.sentinel.engine.internal.storage.codec.gen.CodecBindingCaptureTool</argument>
                 <argument>${project.build.outputDirectory}/META-INF/sentinel/codec-bindings.tsv</argument>
               </arguments>
@@ -180,7 +192,19 @@
               </sources>
             </configuration>
           </execution>
-        <execution><id>engine-regression-tests</id><phase>generate-test-sources</phase><goals><goal>add-test-source</goal></goals><configuration><sources><source>${project.build.directory}/generated-test-sources/engine</source></sources></configuration></execution></executions>
+          <execution>
+            <id>engine-regression-tests</id>
+            <phase>generate-test-sources</phase>
+            <goals>
+              <goal>add-test-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>${project.build.directory}/generated-test-sources/engine</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -216,7 +240,11 @@
             </goals>
             <configuration>
               <createDependencyReducedPom>false</createDependencyReducedPom>
-              <artifactSet><includes><include>uz.sentinel.ac:sentinel-runtime</include></includes></artifactSet>
+              <artifactSet>
+                <includes>
+                  <include>uz.sentinel.ac:sentinel-runtime</include>
+                </includes>
+              </artifactSet>
               <filters>
                 <filter>
                   <artifact>*:*</artifact>

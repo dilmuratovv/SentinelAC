@@ -6,14 +6,16 @@ import json
 from pathlib import Path
 import urllib.request
 
-def download(destination):
+def download(destination, keys=None):
     manifest = json.loads(Path(__file__).with_name('test-dependencies.json').read_text())
     destination.mkdir(parents=True, exist_ok=True)
     result = {}
     for key, item in manifest.items():
+        if keys is not None and key not in keys:
+            continue
         path = destination / item['filename']
         if not path.exists() or hashlib.new(item['hash'], path.read_bytes()).hexdigest() != item['checksum']:
-            request = urllib.request.Request(item['url'], headers={'User-Agent': 'SentinelAC-development-tests/2.4'})
+            request = urllib.request.Request(item['url'], headers={'User-Agent': 'SentinelAC-development-tests/2.6'})
             with urllib.request.urlopen(request, timeout=120) as response:
                 data = response.read()
             if hashlib.new(item['hash'], data).hexdigest() != item['checksum']:

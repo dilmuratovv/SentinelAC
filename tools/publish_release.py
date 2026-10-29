@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish only the hash-verified build; never overwrite a published release."""
+"""Publish a complete matrix atomically: all verified JARs first, then public release."""
 import hashlib
 import json
 import os
@@ -7,8 +7,10 @@ from pathlib import Path
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 
 config = json.loads(Path('release.json').read_text())
+servers = json.loads(Path('tools/server-matrix.json').read_text())['servers']
 repository = os.environ['GITHUB_REPOSITORY']
 revision = os.environ['GITHUB_SHA']
 assert os.environ['GITHUB_REF'] == 'refs/heads/main'
@@ -27,11 +29,29 @@ def api(method, path, body=None, raw=None, content_type=None):
         result = response.read()
         return json.loads(result) if result else None
 
-artifact = Path(config['artifact'])
-digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-assert digest == config['sha256'], 'Artifact differs from the tested build'
-checksums = Path('SHA256SUMS.txt')
-checksums.write_text(digest + '  ' + artifact.name + '\n')
+folder = Path(config['assets_directory'])
+assets, reports, sums = [], [], []
+for server in servers:
+    target = server['version']
+    path = folder / f'SentinelAC-{config["version"]}-paper{target}.jar'
+    report = json.loads((folder / f'verification-paper{target}.json').read_text())
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    assert report['target'] == target and report['sha256'] == digest and report['jar'] == path.name
+    assert report['paper_build'] == server['build'] and report['java'] == server['java']
+    assert report['result'] == 'passed' and report['native_server'] and report['via_server'] and report['translated_client_probes']
+    assert report['unit_tests']['tests'] >= 77
+    assert all(report['unit_tests'][key] == 0 for key in ['failures','errors','skipped'])
+    if target.startswith('1.21'):
+        assert report['native_client_probes'], 'Native legacy protocol was not exercised'
+    with zipfile.ZipFile(path) as jar:
+        metadata = dict(line.split('=',1) for line in jar.read('sentinel-target.properties').decode().splitlines() if '=' in line)
+        assert metadata['minecraft.version'] == target and int(metadata['java.version']) == server['java']
+    assets.append(path); reports.append(report); sums.append(digest + '  ' + path.name)
+assert len(list(folder.glob('*.jar'))) == len(servers), 'Unexpected or missing target JAR'
+checksums = folder / 'SHA256SUMS.txt'; checksums.write_text('\n'.join(sums)+'\n')
+verification = folder / 'VERIFICATION.json'
+verification.write_text(json.dumps({'commit': revision, 'version': config['version'], 'targets': reports}, indent=2)+'\n')
+assets += [checksums, verification]
 try:
     release = api('GET', '/releases/tags/' + urllib.parse.quote(config['tag'], safe=''))
 except urllib.error.HTTPError as error:
@@ -40,35 +60,38 @@ except urllib.error.HTTPError as error:
     release = api('POST', '/releases', {'tag_name': config['tag'], 'target_commitish': revision,
         'name': config['name'], 'body': Path(config['notes']).read_text(), 'draft': True,
         'prerelease': config['prerelease']})
-
 if release['draft']:
     assert release['target_commitish'] == revision, 'Draft targets a different commit'
-    for path in (artifact, checksums):
+    for path in assets:
         for asset in release.get('assets', []):
             if asset['name'] == path.name:
                 api('DELETE', '/releases/assets/' + str(asset['id']))
         upload = release['upload_url'].split('{', 1)[0] + '?name=' + urllib.parse.quote(path.name)
-        api('POST', upload, raw=path.read_bytes(), content_type='application/octet-stream')
+        uploaded = api('POST', upload, raw=path.read_bytes(), content_type='application/octet-stream')
+        assert uploaded['state'] == 'uploaded'
+        if uploaded.get('digest'):
+            assert uploaded['digest'] == 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
     release = api('PATCH', '/releases/' + str(release['id']), {'draft': False, 'make_latest': 'true'})
 else:
     tag = api('GET', '/git/ref/tags/' + urllib.parse.quote(config['tag'], safe=''))
     assert tag['object']['sha'] == revision, 'Existing release targets a different commit'
-    asset = next(item for item in release['assets'] if item['name'] == artifact.name)
-    assert asset.get('digest') == 'sha256:' + digest, 'Published asset differs'
-print('Published: ' + release['html_url'])
+    for path in assets:
+        asset = next(item for item in release['assets'] if item['name'] == path.name)
+        assert asset.get('digest') == 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
+print('Published complete matrix: ' + release['html_url'])
 
-# Exact head leases and an ancestry check protect branches changed since review.
-for branch, expected in config.get('cleanup_branches', {}).items():
+# Remove only this project's merged work branch; retain any later unmerged work.
+for branch in config.get('cleanup_branches', []):
     assert branch.startswith('codex/')
-    ref_path = '/git/refs/heads/' + urllib.parse.quote(branch, safe='/')
+    reference = '/git/ref/heads/' + urllib.parse.quote(branch, safe='/')
     try:
-        ref = api('GET', '/git/ref/heads/' + urllib.parse.quote(branch, safe='/'))
+        ref = api('GET', reference)
     except urllib.error.HTTPError as error:
-        if error.code == 404:
-            continue
+        if error.code == 404: continue
         raise
-    assert ref['object']['sha'] == expected, 'Work branch changed: ' + branch
-    comparison = api('GET', '/compare/' + expected + '...' + revision)
-    assert comparison['behind_by'] == 0, 'Unmerged changes: ' + branch
-    api('DELETE', ref_path)
-    print('Removed merged branch: ' + branch)
+    comparison = api('GET', '/compare/' + ref['object']['sha'] + '...' + revision)
+    if comparison['behind_by'] != 0:
+        print('Preserved branch with unmerged work: ' + branch)
+        continue
+    api('DELETE', '/git/refs/heads/' + urllib.parse.quote(branch, safe='/'))
+    print('Removed merged work branch: ' + branch)

@@ -21,8 +21,8 @@ public final class SentinelPlugin extends SentinelACBukkitLoaderPlugin {
 
     @Override public void onEnable() {
         try {
-            if (!Bukkit.getMinecraftVersion().matches("26\\.2(?:\\.\\d+)?")) {
-                throw new IllegalStateException("This release targets Paper 26.2; found " + Bukkit.getMinecraftVersion());
+            if (!uz.sentinel.ac.compatibility.ServerCompatibility.supports(Bukkit.getMinecraftVersion())) {
+                throw new IllegalStateException("This JAR targets Paper " + uz.sentinel.ac.compatibility.ServerCompatibility.target() + "; found " + Bukkit.getMinecraftVersion());
             }
             saveDefaultConfig();
             settings = readSettings();
@@ -30,7 +30,7 @@ public final class SentinelPlugin extends SentinelACBukkitLoaderPlugin {
             super.onEnable();
             engine = new EngineIntegration(this, bridge::offer);
             bridge.start();
-            getLogger().info("Sentinel ready: Paper 26.2, SentinelAC " + engine.version() + ". Channel policy is not a full mod scan.");
+            getLogger().info("Sentinel ready: Paper " + Bukkit.getMinecraftVersion() + ", SentinelAC " + engine.version() + ". Channel policy is not a full mod scan.");
         } catch (Exception | LinkageError e) {
             getLogger().log(Level.SEVERE, "Sentinel startup failed; protection is NOT ready", e);
             getServer().getPluginManager().disablePlugin(this);
