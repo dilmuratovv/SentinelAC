@@ -112,7 +112,8 @@ def run_case(root, java, artifacts, sentinel, via, client_probes=False, target=N
             command('sac info')
             wait_for('Diagnostika: processed=')
             logs = '\n'.join(path.read_text() for path in (plugins / 'SentinelAC/logs').glob('violations.*.log'))
-            if 'MovementProbe' not in logs or 'Simulation' not in logs:
+            records = [line.split('\t') for line in logs.splitlines()]
+            if not any(len(record) >= 4 and record[2] == 'MovementProbe' and record[3] == 'Simulation' for record in records):
                 raise RuntimeError('Impossible movement did not produce a core Simulation finding')
         command('sac dump')
         wait_for('SentinelAC: diagnostic saved to ')

@@ -1,11 +1,14 @@
 name: Version-specific Paper builds
 on:
   push:
-    branches: [main, 'codex/**']
+    branches: [main]
     paths-ignore: ['**/*.md']
   pull_request:
     paths-ignore: ['**/*.md']
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
