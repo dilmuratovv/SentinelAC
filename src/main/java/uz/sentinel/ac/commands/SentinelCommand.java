@@ -1,177 +1,101 @@
 package uz.sentinel.ac.commands;
 
-import ac.grim.grimac.GrimAPI;
-import ac.grim.grimac.player.GrimPlayer;
-import ac.grim.grimac.predictionengine.MovementCheckRunner;
 import org.bukkit.Bukkit;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
+import org.bukkit.command.*;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
-import uz.sentinel.ac.SentinelBridge;
-import uz.sentinel.ac.checks.Check;
+import uz.sentinel.ac.SentinelPlugin;
+import uz.sentinel.ac.diagnostics.Finding;
 import uz.sentinel.ac.utils.ColorUtil;
-
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
-public class SentinelCommand implements CommandExecutor, TabCompleter {
-    private final Plugin plugin;
-    private final SentinelBridge bridge;
-
-    public SentinelCommand(Plugin plugin, SentinelBridge bridge) {
-        this.plugin = plugin;
-        this.bridge = bridge;
+public final class SentinelCommand implements CommandExecutor, TabCompleter {
+    private final SentinelPlugin plugin;
+    public SentinelCommand(SentinelPlugin plugin) { this.plugin = plugin; }
+    private void send(CommandSender sender, String text) { sender.sendMessage(ColorUtil.color(plugin.settings().prefix() + text)); }
+    private boolean permission(CommandSender sender, String suffix) {
+        if (sender.hasPermission("sentinel." + suffix)) return true;
+        sender.sendMessage(ColorUtil.color(plugin.settings().noPermission().replace("%prefix%", plugin.settings().prefix())));
+        return false;
     }
-
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        String prefix = plugin.getConfig().getString("prefix", "&#FF416Cꜱᴇɴᴛɪɴᴇʟ &#94A3B8»");
-
-        if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
-            sendHelp(sender);
-            return true;
-        }
-
-        String sub = args[0].toLowerCase();
-
-        if (sub.equals("reload")) {
-            if (!sender.hasPermission("sentinel.admin")) {
-                sender.sendMessage(ColorUtil.color(plugin.getConfig().getString("messages.no-permission", "&#EF4444Ruxsat yo'q!")));
-                return true;
+    @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        String sub = args.length == 0 ? "help" : args[0].toLowerCase(Locale.ROOT);
+        try {
+            switch (sub) {
+                case "help" -> {
+                    if (!permission(sender, "info")) return true;
+                    send(sender, "/sentinel info | alerts | profile <player> | channels <player> | history <player> | perf | reload");
+                    send(sender, "Grim sozlamalari va to'liq tarix: /grim help");
+                }
+                case "info", "stats" -> {
+                    if (!permission(sender, "info")) return true;
+                    send(sender, "Sentinel " + plugin.getPluginMeta().getVersion() + " | Paper 26.2 | Grim " + plugin.grim().version());
+                    send(sender, "ViaVersion: " + Bukkit.getPluginManager().isPluginEnabled("ViaVersion")
+                            + " | ViaBackwards: " + Bukkit.getPluginManager().isPluginEnabled("ViaBackwards"));
+                    send(sender, "Channel policy=" + plugin.settings().modEnabled() + ", kick=" + plugin.settings().kickOnChannel()
+                            + ", rate policy=" + plugin.settings().limiterEnabled());
+                    send(sender, "Diagnostika: processed=" + plugin.bridge().processed() + " queued=" + plugin.bridge().queued() + " dropped=" + plugin.bridge().dropped());
+                }
+                case "alerts" -> {
+                    if (!permission(sender, "alerts")) return true;
+                    if (!(sender instanceof Player player)) { send(sender, "Faqat o'yinchilar uchun."); return true; }
+                    send(sender, "Grim va Sentinel alertlari: " + (plugin.grim().toggleAlerts(player) ? "yoqildi" : "o'chirildi"));
+                }
+                case "profile" -> {
+                    if (!permission(sender, "profile")) return true;
+                    if (args.length != 2) { send(sender, "/sentinel profile <player>"); return true; }
+                    Player target = Bukkit.getPlayerExact(args[1]);
+                    if (target == null) { send(sender, "O'yinchi topilmadi."); return true; }
+                    var user = plugin.grim().user(target.getUniqueId());
+                    send(sender, target.getName() + " | ping=" + target.getPing() + "ms | gamemode=" + target.getGameMode());
+                    if (user == null) send(sender, "Grim tracking: unavailable/exempt; klient haqida taxmin qilinmaydi.");
+                    else send(sender, "Client=" + Finding.clean(user.getVersionName(), 64) + " | brand=" + Finding.clean(user.getBrand(), 128));
+                }
+                case "channels" -> {
+                    if (!permission(sender, "profile")) return true;
+                    if (args.length != 2) { send(sender, "/sentinel channels <player>"); return true; }
+                    Player target = Bukkit.getPlayerExact(args[1]);
+                    if (target == null) { send(sender, "O'yinchi topilmadi."); return true; }
+                    send(sender, "Klient e'lon qilgan kanallar (to'liq mod ro'yxati emas):");
+                    target.getListeningPluginChannels().stream().sorted().limit(30)
+                            .forEach(channel -> send(sender, Finding.clean(channel, 193) + plugin.settings().channels().match(channel).map(rule -> " [BLOCK: " + rule + "]").orElse("")));
+                    if (target.getListeningPluginChannels().isEmpty()) send(sender, "Kanal e'lon qilinmagan.");
+                }
+                case "history" -> {
+                    if (!permission(sender, "history")) return true;
+                    if (args.length != 2) { send(sender, "/sentinel history <player>"); return true; }
+                    var findings = plugin.bridge().history(args[1]);
+                    if (findings.isEmpty()) send(sender, "Yaqin tarixda yozuv yo'q. Doimiy loglar: SentinelAC/logs; Grim tarixi: /grim history");
+                    for (Finding f : findings) send(sender, java.time.Instant.ofEpochMilli(f.timeMillis()) + " | " + f.check() + " | " + f.detail());
+                }
+                case "perf", "performance" -> {
+                    if (!permission(sender, "performance")) return true;
+                    send(sender, "Diagnostika: queued=" + plugin.bridge().queued() + " dropped=" + plugin.bridge().dropped());
+                    Bukkit.dispatchCommand(sender, "grim perf");
+                }
+                case "reload" -> {
+                    if (!permission(sender, "reload")) return true;
+                    send(sender, "Konfiguratsiya tekshirilmoqda...");
+                    plugin.reloadSettings().whenComplete((success, error) -> {
+                        if (plugin.isEnabled()) Bukkit.getScheduler().runTask(plugin, () -> {
+                            if (error != null) send(sender, "Reload bajarilmadi: " + Finding.clean(error.getMessage(), 256));
+                            else send(sender, Boolean.TRUE.equals(success) ? "Grim va Sentinel konfiguratsiyasi yangilandi." : "Grim reload xatosi. Sentinel sozlamalari saqlandi; konsolni tekshiring.");
+                        });
+                    });
+                }
+                default -> send(sender, "Noma'lum buyruq. /sentinel help");
             }
-            bridge.reload();
-            String reloadMsg = plugin.getConfig().getString("messages.reload-success", "%prefix% &#10B981Konfiguratsiya yangilandi!");
-            sender.sendMessage(ColorUtil.color(reloadMsg.replace("%prefix%", prefix)));
-            return true;
-        }
-
-        if (sub.equals("alerts")) {
-            if (!(sender instanceof Player player)) {
-                sender.sendMessage(ColorUtil.color(prefix + " &#EF4444Bu buyruq faqat o'yinchilar uchun!"));
-                return true;
-            }
-            if (!player.hasPermission("sentinel.alerts")) {
-                player.sendMessage(ColorUtil.color(plugin.getConfig().getString("messages.no-permission", "&#EF4444Ruxsat yo'q!")));
-                return true;
-            }
-
-            boolean enabled = bridge.toggleAlerts(player.getUniqueId());
-            String key = enabled ? "messages.alerts-toggle-on" : "messages.alerts-toggle-off";
-            String msg = plugin.getConfig().getString(key, "%prefix% Ogohlantirishlar holati o'zgardi.");
-            player.sendMessage(ColorUtil.color(msg.replace("%prefix%", prefix)));
-            return true;
-        }
-
-        if (sub.equals("perf") || sub.equals("performance")) {
-            if (!sender.hasPermission("sentinel.admin")) {
-                sender.sendMessage(ColorUtil.color(plugin.getConfig().getString("messages.no-permission", "&#EF4444Ruxsat yo'q!")));
-                return true;
-            }
-            double millis = MovementCheckRunner.predictionNanos / 1000000.0;
-            double longMillis = MovementCheckRunner.longPredictionNanos / 1000000.0;
-            sender.sendMessage(ColorUtil.color("&#FF416C--------------------------------------------------"));
-            sender.sendMessage(ColorUtil.color("&#FF416C  ꜱᴇɴᴛɪɴᴇʟ &#E2E8F0Fizik Simulyatsiya Unumdorligi:"));
-            sender.sendMessage(ColorUtil.color("  &#94A3B8Prediksiya kechikishi (avg. 500): &#10B981" + String.format("%.4f", millis) + " ms"));
-            sender.sendMessage(ColorUtil.color("  &#94A3B8Prediksiya kechikishi (avg. 20k): &#10B981" + String.format("%.4f", longMillis) + " ms"));
-            sender.sendMessage(ColorUtil.color("  &#94A3B8Holat: " + (millis < 0.1 ? "&#10B981A'lo (0-Lag)" : "&#FFD200Normal")));
-            sender.sendMessage(ColorUtil.color("&#FF416C--------------------------------------------------"));
-            return true;
-        }
-
-        if (sub.equals("profile")) {
-            if (!sender.hasPermission("sentinel.admin")) {
-                sender.sendMessage(ColorUtil.color(plugin.getConfig().getString("messages.no-permission", "&#EF4444Ruxsat yo'q!")));
-                return true;
-            }
-            if (args.length < 2) {
-                sender.sendMessage(ColorUtil.color(prefix + " &#EF4444Foydalanish: /sentinel profile <o'yinchi>"));
-                return true;
-            }
-            Player target = Bukkit.getPlayer(args[1]);
-            if (target == null || !target.isOnline()) {
-                sender.sendMessage(ColorUtil.color(prefix + " &#EF4444O'yinchi topilmadi yoki oflayn!"));
-                return true;
-            }
-            GrimPlayer gp = null;
-            try {
-                gp = GrimAPI.INSTANCE.getPlayerDataManager().getPlayer(target.getUniqueId());
-            } catch (Throwable ignored) {}
-
-            String brand = (gp != null && gp.getBrand() != null) ? gp.getBrand() : "Vanilla";
-            String version = (gp != null && gp.getClientVersion() != null) ? gp.getClientVersion().getReleaseName() : "1.20+";
-            String hSens = (gp != null) ? String.format("%.1f", gp.getHorizontalSensitivity() * 100) : "100.0";
-            String vSens = (gp != null) ? String.format("%.1f", gp.getVerticalSensitivity() * 100) : "100.0";
-
-            sender.sendMessage(ColorUtil.color("&#FF416C=================================================="));
-            sender.sendMessage(ColorUtil.color("&#FF416C  ꜱᴇɴᴛɪɴᴇʟ &#E2E8F0Profil ma'lumotlari: &#FFD200" + target.getName()));
-            sender.sendMessage(ColorUtil.color("  &#94A3B8Ping: &#E2E8F0" + target.getPing() + " ms"));
-            sender.sendMessage(ColorUtil.color("  &#94A3B8Mijoz klienti (Brand): &#E2E8F0" + brand));
-            sender.sendMessage(ColorUtil.color("  &#94A3B8Mijoz versiyasi: &#E2E8F0" + version));
-            sender.sendMessage(ColorUtil.color("  &#94A3B8Gorizontal sezgirlik: &#E2E8F0" + hSens + "%"));
-            sender.sendMessage(ColorUtil.color("  &#94A3B8Vertikal sezgirlik: &#E2E8F0" + vSens + "%"));
-            sender.sendMessage(ColorUtil.color("  &#94A3B8Gamemode: &#E2E8F0" + target.getGameMode().name()));
-            sender.sendMessage(ColorUtil.color("&#FF416C=================================================="));
-            return true;
-        }
-
-        if (sub.equals("info") || sub.equals("stats")) {
-            if (!sender.hasPermission("sentinel.admin")) {
-                sender.sendMessage(ColorUtil.color(plugin.getConfig().getString("messages.no-permission", "&#EF4444Ruxsat yo'q!")));
-                return true;
-            }
-
-            sender.sendMessage(ColorUtil.color("&#FF416C--------------------------------------------------"));
-            sender.sendMessage(ColorUtil.color("&#FF416C  ꜱᴇɴᴛɪɴᴇʟ &#E2E8F0Anticheat Engine &#94A3B8(v2.3.74-SENTINEL)"));
-            sender.sendMessage(ColorUtil.color("&#94A3B8  Muallif: &#FFD200azicoo"));
-            sender.sendMessage(ColorUtil.color("&#94A3B8  Ishchi yadro: &#FFD200Sentinel Hybrid Simulation Engine"));
-            sender.sendMessage(ColorUtil.color("&#94A3B8  Versiya mosligi: &#10B981Paper 26.x (26.1 - 26.3 Universal)"));
-            sender.sendMessage(ColorUtil.color("&#94A3B8  Nazoratdagi o'yinchilar: &#10B981" + Bukkit.getOnlinePlayers().size()));
-            sender.sendMessage(ColorUtil.color("&#94A3B8  Faol qo'shimcha modullar:"));
-            for (Check check : bridge.getChecks()) {
-                sender.sendMessage(ColorUtil.color("   &#10B981✔ &#E2E8F0" + check.getName() + " &#94A3B8- " + check.getDescription()));
-            }
-            sender.sendMessage(ColorUtil.color("&#FF416C--------------------------------------------------"));
-            return true;
-        }
-
-        sendHelp(sender);
+        } catch (IllegalArgumentException | IllegalStateException e) { send(sender, Finding.clean(e.getMessage(), 256)); }
         return true;
     }
-
-    private void sendHelp(CommandSender sender) {
-        sender.sendMessage(ColorUtil.color("&#FF416C--------------------------------------------------"));
-        sender.sendMessage(ColorUtil.color("&#FF416C  ꜱᴇɴᴛɪɴᴇʟ &#E2E8F0Anticheat Boshqaruvi:"));
-        sender.sendMessage(ColorUtil.color("  &#FFD200/sentinel alerts &#94A3B8- Ogohlantirishlarni yoqish/o'chirish"));
-        sender.sendMessage(ColorUtil.color("  &#FFD200/sentinel reload &#94A3B8- Konfiguratsiyani qayta yuklash"));
-        sender.sendMessage(ColorUtil.color("  &#FFD200/sentinel perf   &#94A3B8- Simulyatsiya va unumdorlik statistikasi"));
-        sender.sendMessage(ColorUtil.color("  &#FFD200/sentinel profile <o'yinchi> &#94A3B8- O'yinchi holati"));
-        sender.sendMessage(ColorUtil.color("  &#FFD200/sentinel info   &#94A3B8- Tizim statistikasi va modullar"));
-        sender.sendMessage(ColorUtil.color("&#FF416C--------------------------------------------------"));
-    }
-
-    @Override
-    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) {
-            List<String> list = new ArrayList<>();
-            for (String sub : Arrays.asList("alerts", "reload", "perf", "profile", "info", "stats", "help")) {
-                if (sub.startsWith(args[0].toLowerCase())) {
-                    list.add(sub);
-                }
-            }
-            return list;
-        }
-        if (args.length == 2 && args[0].equalsIgnoreCase("profile")) {
-            List<String> list = new ArrayList<>();
-            for (Player p : Bukkit.getOnlinePlayers()) {
-                if (p.getName().toLowerCase().startsWith(args[1].toLowerCase())) {
-                    list.add(p.getName());
-                }
-            }
-            return list;
+    @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (args.length == 1) return List.of("help", "info", "alerts", "profile", "channels", "history", "perf", "reload").stream()
+                .filter(s -> sender.hasPermission("sentinel." + switch (s) { case "help" -> "info"; case "channels" -> "profile"; case "perf" -> "performance"; default -> s; }))
+                .filter(s -> s.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
+        if (args.length == 2 && List.of("profile", "channels", "history").contains(args[0].toLowerCase(Locale.ROOT))
+                && sender.hasPermission("sentinel." + (args[0].equalsIgnoreCase("history") ? "history" : "profile"))) {
+            return Bukkit.getOnlinePlayers().stream().filter(p -> !(sender instanceof Player viewer) || viewer.canSee(p)).map(Player::getName)
+                    .filter(n -> n.toLowerCase(Locale.ROOT).startsWith(args[1].toLowerCase(Locale.ROOT))).toList();
         }
         return List.of();
     }

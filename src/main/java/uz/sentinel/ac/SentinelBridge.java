@@ -1,168 +1,111 @@
 package uz.sentinel.ac;
 
 import org.bukkit.Bukkit;
-import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.plugin.Plugin;
+import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.scheduler.BukkitTask;
 import uz.sentinel.ac.checks.Check;
 import uz.sentinel.ac.checks.combat.CrystalLimiterCheck;
-import uz.sentinel.ac.checks.combat.ReachCheck;
-import uz.sentinel.ac.checks.food.FoodCheck;
-import uz.sentinel.ac.checks.inventory.AutoTotemCheck;
 import uz.sentinel.ac.checks.mods.ModSentinelCheck;
-import uz.sentinel.ac.commands.SentinelCommand;
+import uz.sentinel.ac.config.SentinelSettings;
+import uz.sentinel.ac.diagnostics.*;
 import uz.sentinel.ac.utils.ColorUtil;
-
+import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
-public final class SentinelBridge implements Listener {
-    private static SentinelBridge instance;
-    private final Plugin plugin;
-    private final List<Check> checks = new ArrayList<>();
-    private final Set<UUID> alertsDisabled = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private BukkitTask bukkitCleanupTask;
-    private Object foliaScheduledTask;
+/** Paper main-thread enforcement, bounded cross-thread diagnostics. */
+public final class SentinelBridge implements Listener, AutoCloseable {
+    private final SentinelPlugin plugin;
+    private final List<Check> checks;
+    private final ArrayBlockingQueue<Finding> pending;
+    private final RecentFindings recent;
+    private final AuditLog log;
+    private final AtomicLong dropped = new AtomicLong();
+    private final Map<Key, Counter> counters = new LinkedHashMap<>() {
+        @Override protected boolean removeEldestEntry(Map.Entry<Key, Counter> entry) { return size() > 4096; }
+    };
+    private BukkitTask drain;
+    private long lastWarning;
+    private long processed;
 
-    private SentinelBridge(Plugin plugin) {
+    public SentinelBridge(SentinelPlugin plugin, SentinelSettings settings) throws IOException {
         this.plugin = plugin;
+        pending = new ArrayBlockingQueue<>(settings.queueCapacity());
+        recent = new RecentFindings(settings.recentCapacity());
+        log = settings.logEnabled() ? new AuditLog(plugin.getDataFolder().toPath().resolve("logs"), settings) : null;
+        checks = List.of(new CrystalLimiterCheck(plugin), new ModSentinelCheck(plugin));
     }
-
-    public static SentinelBridge getInstance() {
-        return instance;
-    }
-
-    public static void init(Plugin plugin) {
-        if (instance != null) return;
-        instance = new SentinelBridge(plugin);
-        instance.start();
-    }
-
-    public static void stop() {
-        if (instance != null) {
-            instance.shutdown();
-            instance = null;
-        }
-    }
-
-    private void start() {
-        // Register Sentinel bridge listener for PlayerQuitEvent
+    public void start() {
         Bukkit.getPluginManager().registerEvents(this, plugin);
-
-        // Register Sentinel custom checks
-        checks.add(new AutoTotemCheck(plugin, this));
-        checks.add(new FoodCheck(plugin, this));
-        checks.add(new ReachCheck(plugin, this));
-        checks.add(new CrystalLimiterCheck(plugin, this));
-        checks.add(new ModSentinelCheck(plugin, this));
-
-        for (Check check : checks) {
-            Bukkit.getPluginManager().registerEvents(check, plugin);
-        }
-
-        // Register Sentinel command
-        PluginCommand cmd = Bukkit.getPluginCommand("sentinel");
-        if (cmd != null) {
-            SentinelCommand executor = new SentinelCommand(plugin, this);
-            cmd.setExecutor(executor);
-            cmd.setTabCompleter(executor);
-        }
-
-        // Periodic violation cleanup
-        long cleanupTicks = plugin.getConfig().getLong("performance.cleanup-interval-ticks", 1200L);
-        Runnable cleanupTask = () -> {
-            for (Check check : checks) {
-                for (Player player : Bukkit.getOnlinePlayers()) {
-                    check.clear(player);
+        for (Check check : checks) Bukkit.getPluginManager().registerEvents(check, plugin);
+        drain = Bukkit.getScheduler().runTaskTimer(plugin, this::drain, 1, 1);
+        // Plugin reloads/startup with already connected players must also check existing channels.
+        checks.stream().filter(ModSentinelCheck.class::isInstance).map(ModSentinelCheck.class::cast)
+                .forEach(check -> Bukkit.getOnlinePlayers().forEach(check::inspectExisting));
+    }
+    public void offer(Finding finding) {
+        if (!pending.offer(finding)) dropped.incrementAndGet();
+    }
+    private void drain() {
+        long now = System.nanoTime();
+        for (int i = 0; i < plugin.settings().eventsPerTick(); i++) {
+            Finding f = pending.poll();
+            if (f == null) break;
+            processed++;
+            Key key = new Key(f.playerId(), f.check(), f.core());
+            Counter c = counters.computeIfAbsent(key, ignored -> new Counter());
+            c.violations = now - c.lastSeen > 300_000_000_000L ? 1 : c.violations + 1;
+            c.lastSeen = now;
+            if (c.lastEmitted != 0 && now - c.lastEmitted < plugin.settings().alertCooldownMillis() * 1_000_000L) continue;
+            c.lastEmitted = now;
+            recent.add(f);
+            if (log != null) log.record(f);
+            if (!f.core()) {
+                String text = plugin.settings().alert().replace("%prefix%", plugin.settings().prefix())
+                        .replace("%player%", f.playerName()).replace("%check%", f.check())
+                        .replace("%vl%", Long.toString(c.violations)).replace("%verbose%", f.detail());
+                plugin.getLogger().info(f.playerName() + " | " + f.check() + " | " + f.detail());
+                for (Player staff : Bukkit.getOnlinePlayers()) {
+                    if (staff.hasPermission("sentinel.alerts") && plugin.grim().alertsEnabled(staff)) staff.sendMessage(ColorUtil.color(text));
                 }
             }
-        };
-
-        try {
-            // Check for Folia / modern Paper async scheduler
-            Class<?> asyncSchedulerClass = Class.forName("io.papermc.paper.threadedregions.scheduler.AsyncScheduler");
-            Object asyncScheduler = Bukkit.class.getMethod("getAsyncScheduler").invoke(null);
-            foliaScheduledTask = asyncSchedulerClass.getMethod("runAtFixedRate", Plugin.class, java.util.function.Consumer.class, long.class, long.class, TimeUnit.class)
-                    .invoke(asyncScheduler, plugin, (java.util.function.Consumer<Object>) o -> cleanupTask.run(), cleanupTicks * 50L, cleanupTicks * 50L, TimeUnit.MILLISECONDS);
-        } catch (Throwable t) {
-            // Fallback to standard Bukkit async task
-            bukkitCleanupTask = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, cleanupTask, cleanupTicks, cleanupTicks);
         }
-
-        // Banner in console
-        Bukkit.getConsoleSender().sendMessage(ColorUtil.color("&#FF416C======================================================"));
-        Bukkit.getConsoleSender().sendMessage(ColorUtil.color("&#FF416C  ____             _   _            _      _    ____ "));
-        Bukkit.getConsoleSender().sendMessage(ColorUtil.color("&#FF416C / ___|  ___ _ __ | |_(_)_ __   ___| |    / \\  / ___|"));
-        Bukkit.getConsoleSender().sendMessage(ColorUtil.color("&#FF416C \\___ \\ / _ \\ '_ \\| __| | '_ \\ / _ \\ |   / _ \\| |    "));
-        Bukkit.getConsoleSender().sendMessage(ColorUtil.color("&#FF416C  ___) |  __/ | | | |_| | | | |  __/ |  / ___ \\ |___ "));
-        Bukkit.getConsoleSender().sendMessage(ColorUtil.color("&#FF416C |____/ \\___|_| |_|\\__|_|_| |_|\\___|_| /_/   \\_\\____|"));
-        Bukkit.getConsoleSender().sendMessage(ColorUtil.color("&#FF416C  Next-Gen Universal Anticheat Engine (v2.3.74-SENTINEL)"));
-        Bukkit.getConsoleSender().sendMessage(ColorUtil.color("&#10B981  1:1 Fizik Simulyatsiya + Max-Efficiency Himoya Faollashdi!"));
-        Bukkit.getConsoleSender().sendMessage(ColorUtil.color("&#FF416C======================================================"));
+        if (dropped.get() > 0 && now - lastWarning > 60_000_000_000L) {
+            lastWarning = now;
+            plugin.getLogger().warning("Diagnostics queue overflow: " + dropped.get() + " dropped. Grim checks remain independent.");
+        }
     }
-
-    private void shutdown() {
-        if (bukkitCleanupTask != null) {
-            bukkitCleanupTask.cancel();
-            bukkitCleanupTask = null;
+    public List<Finding> history(String player) { return recent.recent(player, 10); }
+    public long processed() { return processed; }
+    public int queued() { return pending.size(); }
+    public long dropped() { return dropped.get() + (log == null ? 0 : log.dropped()); }
+    public void reloaded() { checks.forEach(Check::reload); }
+    @EventHandler(priority = EventPriority.MONITOR) public void onQuit(PlayerQuitEvent event) {
+        UUID id = event.getPlayer().getUniqueId();
+        checks.forEach(check -> check.onQuit(id));
+        counters.keySet().removeIf(key -> key.player.equals(id));
+    }
+    @EventHandler public void onEngineDisable(PluginDisableEvent event) {
+        if (event.getPlugin().getName().equals("GrimAC") && plugin.isEnabled()) {
+            plugin.getLogger().severe("GrimAC stopped. Sentinel is disabling because its engine is unavailable.");
+            Bukkit.getPluginManager().disablePlugin(plugin);
         }
-        if (foliaScheduledTask != null) {
-            try {
-                foliaScheduledTask.getClass().getMethod("cancel").invoke(foliaScheduledTask);
-            } catch (Throwable ignored) {}
-            foliaScheduledTask = null;
-        }
+    }
+    @Override public void close() {
+        if (drain != null) drain.cancel();
         HandlerList.unregisterAll(this);
-        for (Check check : checks) {
-            HandlerList.unregisterAll(check);
-        }
-        checks.clear();
-        alertsDisabled.clear();
+        for (Check check : checks) { HandlerList.unregisterAll(check); check.close(); }
+        pending.clear();
+        counters.clear();
+        if (log != null) log.close();
     }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onQuit(PlayerQuitEvent event) {
-        UUID uuid = event.getPlayer().getUniqueId();
-        alertsDisabled.remove(uuid);
-        for (Check check : checks) {
-            check.onQuit(uuid);
-        }
-    }
-
-    public void reload() {
-        plugin.reloadConfig();
-        try {
-            if (ac.grim.grimac.GrimAPI.INSTANCE != null && ac.grim.grimac.GrimAPI.INSTANCE.getExternalAPI() != null) {
-                ac.grim.grimac.GrimAPI.INSTANCE.getExternalAPI().reloadAsync();
-            }
-        } catch (Throwable ignored) {}
-        for (Check check : checks) {
-            check.reload();
-        }
-    }
-
-    public boolean hasAlertsEnabled(UUID uuid) {
-        return !alertsDisabled.contains(uuid);
-    }
-
-    public boolean toggleAlerts(UUID uuid) {
-        if (alertsDisabled.contains(uuid)) {
-            alertsDisabled.remove(uuid);
-            return true;
-        } else {
-            alertsDisabled.add(uuid);
-            return false;
-        }
-    }
-
-    public List<Check> getChecks() {
-        return Collections.unmodifiableList(checks);
-    }
+    private record Key(UUID player, String check, boolean core) {}
+    private static final class Counter { long violations; long lastSeen; long lastEmitted; }
 }
