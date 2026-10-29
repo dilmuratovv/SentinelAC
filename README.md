@@ -1,5 +1,7 @@
 # SentinelAC — Paper 26.2
 
+[GitHub release va JAR yuklamasi](https://github.com/dilmuratovv/SentinelAC/releases/tag/v2.5.0-paper26.2).
+
 **Bitta JAR: `SentinelAC-2.5.0-paper26.2.jar`. Paper 26.2 va Java 25 uchun.** Harakat, Reach, Timer, Knockback va paket tekshiruvlari ichki prediction yadrosida ishlaydi. Sentinel kanal blacklisti, crystal/anchor tezlik qoidalari va chegaralangan diagnostikani qo‘shadi.
 
 ## O‘rnatish
@@ -65,7 +67,6 @@ JDK 25, Maven 3.9+, Python 3 va Git:
 ```sh
 git clone --recurse-submodules https://github.com/dilmuratovv/SentinelAC.git
 cd SentinelAC
-git checkout codex/standalone-sentinel-26.2
 git submodule update --init --recursive
 mvn -B -ntp clean verify
 python3 tools/verify_artifact.py plugin/target/SentinelAC-2.5.0-paper26.2.jar
