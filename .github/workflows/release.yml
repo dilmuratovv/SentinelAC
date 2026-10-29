@@ -1,0 +1,32 @@
+name: Publish Paper 26.2 release
+on:
+  push:
+    branches: [main]
+    paths: [release.json]
+permissions:
+  contents: read
+concurrency:
+  group: release-paper-26.2
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - run: mvn -B -ntp clean verify
+      - run: python3 tools/verify_artifact.py plugin/target/SentinelAC-2.5.0-paper26.2.jar
+      - name: Publish verified assets and remove merged work branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/publish_release.py
