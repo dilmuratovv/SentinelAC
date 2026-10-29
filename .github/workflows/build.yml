@@ -1,0 +1,58 @@
+name: Paper 26.2 build
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      smoke:
+        description: Run local Paper test servers (requires EULA acceptance below)
+        type: boolean
+        default: false
+      accept_eula:
+        description: I accept https://www.minecraft.net/eula for the temporary test servers
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - run: mvn -B -ntp clean verify
+      - run: python3 tools/verify_artifact.py plugin/target/SentinelAC-2.5.0-paper26.2.jar
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: github.event_name == 'workflow_dispatch' && inputs.smoke && inputs.accept_eula
+        with:
+          node-version: '22'
+      - name: Optional local protocol and boot tests
+        if: github.event_name == 'workflow_dispatch' && inputs.smoke && inputs.accept_eula
+        run: |
+          npm ci --prefix tools/client
+          python3 tools/smoke_paper.py --accept-eula --client-probes --java "$JAVA_HOME/bin/java"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: SentinelAC-paper26.2
+          path: |
+            plugin/target/SentinelAC-2.5.0-paper26.2.jar
+            plugin/target/surefire-reports/*.txt
+            deployment/
+            README.md
+            docs/VALIDATION.md
+            LICENSE
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.smoke && inputs.accept_eula
+        with:
+          name: paper-smoke-logs
+          path: target/smoke/**/smoke-output.log
