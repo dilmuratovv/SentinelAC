@@ -106,16 +106,22 @@ def run_case(root, java, artifacts, sentinel, via, client_probes=False, target=N
             if result.returncode:
                 raise RuntimeError('Protocol client checks failed: ' + result.stderr)
             result = subprocess.run(['node', str(Path(__file__).with_name('client') / 'movement.cjs'), str(port), movement_client],
-                                    text=True, capture_output=True, timeout=25)
+                                    text=True, capture_output=True, timeout=30)
             print(result.stdout, end='', flush=True)
             if result.returncode:
                 raise RuntimeError('Movement probe failed: ' + result.stderr)
             command('sac info')
             wait_for('Diagnostika: processed=')
-            logs = '\n'.join(path.read_text() for path in (plugins / 'SentinelAC/logs').glob('violations.*.log'))
-            records = [line.split('\t') for line in logs.splitlines()]
-            if not any(len(record) >= 4 and record[2] == 'MovementProbe' and record[3] == 'Simulation' for record in records):
-                raise RuntimeError('Impossible movement did not produce a core Simulation finding')
+            # The audit writer is asynchronous; await the exact player's record.
+            audit_deadline = time.monotonic() + 3
+            while True:
+                logs = '\n'.join(path.read_text() for path in (plugins / 'SentinelAC/logs').glob('violations.*.log'))
+                records = [line.split('\t') for line in logs.splitlines()]
+                if any(len(record) >= 4 and record[2] == 'MovementProbe' and record[3] == 'Simulation' for record in records):
+                    break
+                if time.monotonic() >= audit_deadline:
+                    raise RuntimeError('Impossible movement did not produce a core Simulation finding')
+                time.sleep(0.05)
         command('sac dump')
         wait_for('SentinelAC: diagnostic saved to ')
         command('sac perf')

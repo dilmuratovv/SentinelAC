@@ -7,5 +7,6 @@
   "assets_directory": "release-assets",
   "cleanup_branches": [
     "codex/multi-version-2.6"
-  ]
+  ],
+  "verification_revision": 2
 }
