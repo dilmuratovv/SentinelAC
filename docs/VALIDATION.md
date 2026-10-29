@@ -1,40 +1,58 @@
-# Paper 26.2 validation
+# SentinelAC 2.5.0 — validation
 
-Date: 2026-10-29. Release candidate: **SentinelAC 2.4.0-paper26.2**.
+Test date: **2026-10-29**. Target: **Paper 26.2 build 135**, **Java 25**. This report describes the standalone source build, with no separate anticheat engine plugin installed.
 
-## What was verified locally
+## Build and artifact
 
-| Check | Result | Scope |
+- `mvn clean verify`: **76 tests passed; 0 failures, errors or skips**, across 19 suites. This includes 48 pinned upstream regression tests and 28 Sentinel tests.
+- All 949 engine/API source files are generated from pinned source submodules and compiled, alongside Sentinel sources. The final archive has 1,334 non-library core classes, including compiler-generated nested classes.
+- SHA256: `744a4d5d19722f228be9a90ac18f9bd626f0c98fbffd10100fc2071aef29bcfb`.
+- `tools/verify_artifact.py` passes: standalone loader, bundled PacketEvents, Java 25 core bytecode, no old engine/server classes, no duplicate archive entries, all five backend defaults, codec metadata and original legal notices.
+- Classfile UTF8 constants, resource contents and archive paths have no old branding outside legal notices. The eight FastUtil serialized-lambda descriptor strings missed by ordinary Shade relocation are corrected, with classfile lengths preserved.
+- The third-party carrier's SLF4J copyright/license is retained separately from the plugin GPL license. The upstream compatibility shim is excluded from the carrier and compiled from source.
+
+Source pins and library carrier checksum are documented in README and `tools/test-dependencies.json`. Raw upstream sources and their licenses remain in submodules.
+
+## Automated regression coverage
+
+Sentinel tests cover immutable exact-channel/namespace matching, invalid configuration rejection, monotonic sliding windows and burst boundaries, shared offhand/main-hand crystal limits, respawn-anchor charging distinction, delayed kicks with policy/exemption rechecks, finite recent history, log sanitation, permission checks, and preserving cancelled public API flags.
+
+The changed ray arithmetic is compared bit-for-bit with the pinned original over **25,000 random rays/boxes** and signed-zero, parallel, inside-origin and boundary cases. This verifies the scoped arithmetic change; it does not establish an improvement in global TPS. The JVM may already eliminate some original allocations.
+
+Webhook tests exercise queue overflow, network failures, missing rate-limit headers, the three-attempt limit, one in-flight request, expiry and shutdown completion. No external webhook was sent. Existing upstream tests cover session continuity/publication, lease ownership, heartbeat scheduling, reconnect/recovery and verbose schemas.
+
+## Live localhost Paper tests
+
+The smoke harness ran temporary **offline-mode, localhost-only** flat worlds. Test JARs were hash verified. Native case: only SentinelAC. Via case: SentinelAC, ViaVersion **5.12.2**, ViaBackwards **5.12.2**.
+
+Both cases passed:
+
+- Startup and `Sentinel ready: Paper 26.2`; no engine initialization/command registration failure.
+- `/sac info`, `/sentinelac version`, `/sentinel help`, and the custom help entries.
+- Valid reload, rejection of crystal limit `0`, then recovery with valid configuration.
+- Local `/sac dump` file creation and `/sac perf` output.
+- SQLite initialization/reload and orderly shutdown.
+
+Via client probes passed:
+
+| Client | Probe | Result |
 |---|---|---|
-| Maven build on JDK 25 | PASS | Compiles against pinned Paper API 26.2 build 135 and official Grim Bukkit API |
-| JUnit tests | PASS, 23 tests, zero failures/errors/skips | Channel boundaries, locale, config rejection, legacy conversion, sliding-window bursts, permission gates, exemption, deferred kicks, action budgets, bounded history, log sanitization, public API readiness/cancellation |
-| Artifact inspection | PASS | Java 25 non-preview classes; Paper 26.2 manifest; required Grim dependency; no bundled engine/server classes or stale config templates |
-| Native Paper startup | PASS | Paper 26.2 build 135 + official GrimAC 2.3.74 + Sentinel |
-| Native console commands | PASS | info, successful reload, invalid reload rejection, recovery reload, perf, clean stop |
-| Via startup | PASS | Above plus ViaVersion 5.12.2 / ViaBackwards 5.12.2 on the backend |
-| 1.21.11 translated client | PASS | Offline localhost clean login/idle; a second client declaring `baritone:channel` was kicked |
-| 26.1 translated client | PASS | Offline localhost clean login/idle; a second client declaring `baritone:channel` was kicked |
+| 1.21.11 | Login and 2.5 seconds idle | Stayed connected |
+| 1.21.11 | Register `baritone:channel` | Kicked with the matching rule |
+| 26.1 | Login and 2.5 seconds idle | Stayed connected |
+| 26.1 | Register `baritone:channel` | Kicked with the matching rule |
+| 26.1 | Impossible upward movement | Server correction and an actual core `Simulation` audit finding |
 
-The channel probes exercise a declared-channel policy. They do not demonstrate detection of an installed/hidden Baritone mod. The diagnostic logs for these probes contained the blocked-channel findings and no findings for the two clean clients during their short login/idle sessions.
+The movement probe answers transaction pings, acknowledges teleports and sends movement/tick-end packets. The harness requires a `Simulation` finding as well as a correction, since a vanilla teleport alone would not prove the engine acted.
 
-Upstream artifact URLs, version IDs and SHA-256/SHA-512 values are pinned in `tools/test-dependencies.json`. The final JAR can be rebuilt with `mvn -B clean verify`; `tools/verify_artifact.py` validates its packaging. CI builds and uploads the companion JAR and test summaries. Optional workflow smoke tests require an explicit EULA checkbox.
+Logs are produced at `target/smoke/native/smoke-output.log` and `target/smoke/via/smoke-output.log`. Test-environment network warnings from Mojang public-key requests and optional server/plugin update requests were observed; online authentication was not tested.
 
-## Important remaining limits
+## Limits and staging work
 
-- No real native Minecraft 26.2 game client was driven by these tests. Native server/plugin startup was tested. The protocol test library supports 1.21.11 and 26.1, used through ViaBackwards.
-- These are boot, command, API, policy and limited protocol tests. Full survival/PvP/crystal/elytra/vehicle gameplay, a cheat corpus, prolonged low-TPS/high-ping play, and CPU/RAM load benchmarks were not performed.
-- **Upstream GrimAC warns about ViaBackwards on 1.21.2+ servers and older clients using vehicles.** This warning is not suppressed or presented as fixed. Neither the tested handshakes nor a Paper version label certify every translated physics combination. See the [upstream initialization check](https://github.com/GrimAnticheat/Grim/blob/v2.3.74/common/src/main/java/ac/grim/grimac/manager/init/start/ViaVersion.java).
-- The localhost test servers were offline, bound to 127.0.0.1. Online authentication was not tested. The execution environment could not resolve the Mojang public-key endpoint and emitted environment/system-information warnings; these were not classified as Sentinel test failures.
-- The optional enforcement profile is a configurable starting point, not a measured universal ban threshold. It uses kicks for repeated flags and no permanent bans. Review false positives on a server copy before applying it.
-- The public Grim API and physics engine remain external dependencies. This change does not patch upstream Discord retry/queue behavior. Grim's webhook is off in the tested default configuration; Sentinel has no outgoing webhook queue.
+`minecraft-protocol` 1.68.0 provides 26.1 and 1.21.11, but no native 26.2 game client. Native 26.2 **server boot/commands** were tested, not a complete native player session. The probes do not simulate normal gameplay physics comprehensively or certify zero false positives.
 
-## Manual gameplay checklist before a public rollout
+Upstream's warning about ViaBackwards vehicle support on 1.21.2+ servers remains. Older client versions, native 26.2 gameplay, vehicles, elytra, knockback/PvP, low TPS/high ping and interactions with the actual server plugin set need staging playtests. High-online CPU/heap profiling and controlled cheat-client tests have not been performed; no zero-lag or universal detection guarantee is made.
 
-1. Use a backup/server copy with the intended Via placement and all gameplay plugins.
-2. Test native 26.2 and each client version you plan to allow: movement, water, elytra, knockback, combat, inventory, crystals, anchors and vehicles.
-3. Repeat with realistic latency and TPS variation. Inspect Grim and Sentinel findings and `dropped` diagnostics.
-4. Verify staff permissions, exemptions, blacklist kick messages, valid/invalid reloads, restart and log rotation.
-5. Decide the allowed client range. Avoid promising support for translated vehicle combinations upstream does not support.
-6. Calibrate the optional kick profile from observed behavior; retain logs for reviewing disputed actions.
+Only SQLite was exercised live. MySQL/PostgreSQL/MongoDB/Redis templates are present, but those external backends and their optional driver plugins were not integration tested. Discord delivery was tested with mocks only. The optional kick punishment profile is not a universally calibrated enforcement policy and is not installed automatically.
 
-Source ownership is preserved in Git history. The old opaque modified-engine binaries are intentionally removed from the current source tree. Install the official Bukkit Grim release alongside the new companion, following the migration instructions in the README.
+Channel blacklisting observes advertised plugin channels; clients can hide them. It cannot enumerate every installed mod or detect every client-only ESP/X-ray. Existing history databases/configurations from old modified binaries are not automatically certified for migration. Back up and compare them before adoption.

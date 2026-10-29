@@ -1,0 +1,30 @@
+schema-version: 1
+prefix: '&#FF416C[SENTINEL] &#E2E8F0'
+messages:
+  alert: '%prefix%%player% | %check% | x%vl% | %verbose%'
+  no-permission: "%prefix%Bu buyruq uchun ruxsat yo'q."
+  kick: "%prefix%Server qoidalariga zid klient kanali: %channel%\nMos qoida: %rule%"
+mod-sentinel:
+  enabled: true
+  kick-on-detect: true
+  join-check-delay-ticks: 10
+  # Exact identifiers/namespaces, never substrings. Not a full mod inventory.
+  blacklisted-channels: ['baritone:channel', 'freecam:sync']
+  blacklisted-namespaces: [baritone, freecam, xaerominimap, xaeroworldmap, tweakeroo, meteor, wurst, liquidbounce]
+exploits:
+  crystal-limiter:
+    enabled: true
+    # Server rate policies, not proof of cheating. Both hands share one limit.
+    max-crystals-per-second: 12
+    max-breaks-per-second: 14
+    max-anchors-per-second: 8
+diagnostics:
+  # Overflow drops diagnostics only; Engine enforcement is independent.
+  queue-capacity: 2048
+  events-per-tick: 100
+  recent-capacity: 2048
+  alert-cooldown-ms: 1000
+  log-enabled: true
+  log-file-size-bytes: 5242880
+  log-file-count: 3
+# Discord notifications are opt-in; diagnostics stay local.
