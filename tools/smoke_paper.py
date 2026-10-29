@@ -40,6 +40,7 @@ def run_case(root, java, artifacts, sentinel, via, client_probes=False, target=N
         port = listener.getsockname()[1]
     (directory / 'server.properties').write_text(
         f'server-ip=127.0.0.1\nserver-port={port}\nonline-mode=false\n'
+        'white-list=false\nenforce-whitelist=false\n'
         'enable-status=true\nmax-players=5\nview-distance=2\nsimulation-distance=2\n'
         'generate-structures=false\nlevel-type=minecraft:flat\nspawn-protection=0\n'
         'generator-settings={"biome":"minecraft:plains","layers":[{"block":"minecraft:bedrock","height":1},{"block":"minecraft:dirt","height":2},{"block":"minecraft:grass_block","height":1}]}\n')

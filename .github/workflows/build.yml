@@ -28,6 +28,8 @@ jobs:
           import json, os, subprocess
           from pathlib import Path
           entries = json.loads(Path('tools/server-matrix.json').read_text())['servers']
+          priority = ['26.3', '1.21', '26.1.1', '1.21.11']
+          entries.sort(key=lambda e: priority.index(e['version']) if e['version'] in priority else len(priority))
           targets = {'include': [{'target': e['version'], 'java': str(e['java'])} for e in entries]}
           changed = subprocess.check_output(['git', 'diff', '--name-only', 'HEAD^', 'HEAD'], text=True).splitlines()
           publish = os.environ['GITHUB_EVENT_NAME'] == 'push' and os.environ['GITHUB_REF'] == 'refs/heads/main' and 'release.json' in changed
