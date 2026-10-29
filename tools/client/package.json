@@ -1,0 +1,9 @@
+{
+  "name": "sentinel-protocol-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Test clients only; not bundled into SentinelAC",
+  "dependencies": {
+    "minecraft-protocol": "1.68.0"
+  }
+}

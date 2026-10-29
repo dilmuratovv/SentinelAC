@@ -1,76 +1,47 @@
 name: SentinelAC
-version: 2.3.74-SENTINEL
+version: '${project.version}'
 main: uz.sentinel.ac.SentinelPlugin
-description: Universal Next-Gen Anticheat Engine for Minecraft 26.x
-author: azicoo
-website: https://sentinel.uz/
+description: Paper 26.2 enforcement and diagnostics with the official GrimAC engine
+authors: [azicoo]
+website: https://github.com/dilmuratovv/SentinelAC
+api-version: '26.2'
+depend: [GrimAC]
+softdepend: [ViaVersion, ViaBackwards, floodgate]
 commands:
   sentinel:
-    description: SentinelAC boshqaruv buyrug'i
+    description: SentinelAC boshqaruvi
     aliases: [sac, sentinelac]
-    permission: sentinel.admin
 permissions:
   sentinel.admin:
-    description: SentinelAC boshqaruvi
     default: op
+    children:
+      sentinel.alerts: true
+      sentinel.profile: true
+      sentinel.performance: true
+      sentinel.history: true
+      sentinel.reload: true
+      sentinel.info: true
   sentinel.alerts:
-    description: Ogohlantirishlarni ko'rish
     default: op
-  sentinel.alerts.enable-on-join:
-    description: Kirganda ogohlantirishlarni yoqish
-    default: op
-  sentinel.brand:
-    description: Klient brandlarini ko'rish
-    default: op
-  sentinel.brand.enable-on-join:
-    description: Kirganda klient brandlarini ko'rish
-    default: op
-  sentinel.disabled:
-    description: SentinelAC tekshiruvlarini o'chirish
-    default: "false"
-  sentinel.exempt:
-    description: Barcha tekshiruvlardan ozod qilish
-    default: "false"
-  sentinel.list:
-    description: Ro'yxatlarni ko'rish
-    default: "false"
-  sentinel.nomodifypacket:
-    description: Paket modifikatsiyasini o'chirish
-    default: "false"
-  sentinel.nosetback:
-    description: Setbackni o'chirish
-    default: "false"
-  sentinel.performance:
-    description: Unumdorlik ko'rsatkichlarini ko'rish
-    default: op
+    children:
+      grim.alerts: true
+      grim.alerts.enable-on-join: true
   sentinel.profile:
-    description: O'yinchi profilini ko'rish
     default: op
-  sentinel.sendalert:
-    description: Ogohlantirish yuborish
+    children:
+      grim.profile: true
+  sentinel.performance:
     default: op
-  sentinel.verbose:
-    description: Kengaytirilgan verbose ogohlantirishlarini ko'rish
+    children:
+      grim.performance: true
+  sentinel.history:
     default: op
-  sentinel.verbose.enable-on-join:
-    description: Kirganda verbose ogohlantirishlarini yoqish
-    default: "false"
-api-version: "1.13"
-softdepend:
-  - ProtocolLib
-  - ProtocolSupport
-  - Essentials
-  - ViaVersion
-  - ViaBackwards
-  - ViaRewind
-  - Geyser-Spigot
-  - floodgate
-  - FastLogin
-  - PlaceholderAPI
-  - LuckPerms
-  - sqlite-jdbc
-  - mysql-jdbc
-  - postgresql-jdbc
-  - mongodb-driver
-  - jedis
-folia-supported: true
+  sentinel.reload:
+    default: op
+  sentinel.info:
+    default: op
+  sentinel.exempt:
+    description: Sentinel qoidalari va Grim tekshiruvlaridan ozod qiladi
+    default: false
+    children:
+      grim.exempt: true

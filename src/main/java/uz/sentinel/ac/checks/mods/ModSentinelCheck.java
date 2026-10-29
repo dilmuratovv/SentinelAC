@@ -4,70 +4,79 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerRegisterChannelEvent;
-import org.bukkit.plugin.Plugin;
-import uz.sentinel.ac.SentinelBridge;
+import org.bukkit.scheduler.BukkitTask;
+import uz.sentinel.ac.SentinelPlugin;
 import uz.sentinel.ac.checks.Check;
+import uz.sentinel.ac.diagnostics.Finding;
 import uz.sentinel.ac.utils.ColorUtil;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+/** Inspect declared channels on join and on later registration. No client file scanning. */
+public final class ModSentinelCheck extends Check {
+    private final Map<UUID, BukkitTask> joins = new HashMap<>();
+    private final Map<UUID, BukkitTask> kicks = new HashMap<>();
+    public ModSentinelCheck(SentinelPlugin plugin) { super(plugin); }
 
-public class ModSentinelCheck extends Check {
-    private boolean enabled = true;
-    private boolean kickOnDetect = true;
-    private String kickMessage = "";
-    private final Set<String> blacklistedChannels = new HashSet<>();
-
-    public ModSentinelCheck(Plugin plugin, SentinelBridge bridge) {
-        super(plugin, bridge, "ModSentinel", "Mijoz (Client) tomondagi taqiqlangan modlarni aniqlash");
-        reload();
-    }
-
-    @Override
-    public void reload() {
-        this.enabled = plugin.getConfig().getBoolean("mod-sentinel.enabled", true);
-        this.kickOnDetect = plugin.getConfig().getBoolean("mod-sentinel.kick-on-detect", true);
-        this.kickMessage = plugin.getConfig().getString("mod-sentinel.kick-message",
-                "&#FF416C[SENTINEL AC HIMOYASI]\n&#E2E8F0Taqiqlangan mod aniqlandi: &#FFD200%mod%");
-
-        blacklistedChannels.clear();
-        List<String> list = plugin.getConfig().getStringList("mod-sentinel.blacklisted-mods");
-        for (String item : list) {
-            blacklistedChannels.add(item.toLowerCase());
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onChannelRegister(PlayerRegisterChannelEvent event) {
-        if (!enabled) return;
-
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        if (player.hasPermission("sentinel.exempt")) return;
-
-        String channel = event.getChannel().toLowerCase();
-
-        for (String blacklisted : blacklistedChannels) {
-            if (channel.contains(blacklisted) || channel.equalsIgnoreCase(blacklisted)) {
-                String detectedMod = blacklisted.toUpperCase();
-                flag(player, "Taqiqlangan mod kanali aniqlandi: " + channel);
-
-                if (kickOnDetect) {
-                    Runnable kickTask = () -> {
-                        String msg = kickMessage.replace("%mod%", detectedMod);
-                        player.kickPlayer(ColorUtil.color(msg));
-                    };
-                    try {
-                        // Folia regional entity scheduler
-                        player.getScheduler().run(plugin, scheduledTask -> kickTask.run(), null);
-                    } catch (Throwable t) {
-                        // Paper / Spigot standard scheduler fallback
-                        Bukkit.getScheduler().runTask(plugin, kickTask);
-                    }
-                }
-                break;
-            }
+        inspectExisting(player);
+        BukkitTask previous = joins.remove(player.getUniqueId());
+        if (previous != null) previous.cancel();
+        joins.put(player.getUniqueId(), Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            joins.remove(player.getUniqueId());
+            if (player.isOnline()) inspectExisting(player);
+        }, plugin.settings().joinDelayTicks()));
+    }
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onChannelRegister(PlayerRegisterChannelEvent event) {
+        if (Bukkit.isPrimaryThread()) inspect(event.getPlayer(), event.getChannel());
+        else {
+            UUID id = event.getPlayer().getUniqueId();
+            String channel = event.getChannel();
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Player player = Bukkit.getPlayer(id);
+                if (player != null) inspect(player, channel);
+            });
         }
+    }
+    public void inspectExisting(Player player) {
+        if (!plugin.settings().modEnabled() || exempt(player)) return;
+        for (String channel : player.getListeningPluginChannels()) inspect(player, channel);
+    }
+    public void inspect(Player player, String channel) {
+        if (!plugin.settings().modEnabled() || exempt(player) || kicks.containsKey(player.getUniqueId())) return;
+        plugin.settings().channels().match(channel).ifPresent(rule -> {
+            flag(player, "ChannelPolicy", "channel=" + channel + " rule=" + rule);
+            if (!plugin.settings().kickOnChannel()) return;
+            // Defer until the registration callback has unwound. One pending kick per player.
+            kicks.put(player.getUniqueId(), Bukkit.getScheduler().runTask(plugin, () -> {
+                kicks.remove(player.getUniqueId());
+                if (!player.isOnline() || !plugin.settings().modEnabled() || !plugin.settings().kickOnChannel() || exempt(player)) return;
+                plugin.settings().channels().match(channel).ifPresent(currentRule -> {
+                    String message = plugin.settings().kick().replace("%prefix%", plugin.settings().prefix())
+                            .replace("%channel%", Finding.clean(channel, 193)).replace("%rule%", currentRule);
+                    player.kickPlayer(ColorUtil.color(message));
+                });
+            }));
+        });
+    }
+    @Override public void onQuit(UUID uuid) {
+        BukkitTask join = joins.remove(uuid), kick = kicks.remove(uuid);
+        if (join != null) join.cancel();
+        if (kick != null) kick.cancel();
+    }
+    @Override public void reload() {
+        // Re-evaluate delayed callbacks against the new immutable snapshot.
+        Bukkit.getOnlinePlayers().forEach(this::inspectExisting);
+    }
+    @Override public void close() {
+        joins.values().forEach(BukkitTask::cancel);
+        kicks.values().forEach(BukkitTask::cancel);
+        joins.clear(); kicks.clear();
     }
 }
