@@ -12,3 +12,9 @@ Thumbs.db
 *.log
 *.tmp
 
+# Release JARs are produced by CI, not committed as unreviewable engine copies.
+/*.jar
+node_modules/
+__pycache__/
+*.py[cod]
+

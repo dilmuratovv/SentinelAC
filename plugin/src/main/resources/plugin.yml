@@ -1,0 +1,82 @@
+name: SentinelAC
+version: '${project.version}'
+main: uz.sentinel.ac.SentinelPlugin
+description: Standalone prediction anticheat and server policies for Paper 26.2
+authors: [azicoo]
+website: https://github.com/dilmuratovv/SentinelAC
+api-version: '26.2'
+softdepend: [ProtocolLib, ProtocolSupport, Essentials, ViaVersion, ViaBackwards, ViaRewind, Geyser-Spigot, floodgate, FastLogin, PlaceholderAPI, LuckPerms, sqlite-jdbc, mysql-jdbc, postgresql-jdbc, mongodb-driver, jedis]
+permissions:
+  sentinel.admin:
+    default: op
+    children:
+      sentinel.alerts: true
+      sentinel.alerts.enable-on-join: true
+      sentinel.performance: true
+      sentinel.profile: true
+      sentinel.brand: true
+      sentinel.brand.enable-on-join: true
+      sentinel.sendalert: true
+      sentinel.verbose: true
+      sentinel.list: true
+      sentinel.history: true
+      sentinel.reload: true
+      sentinel.info: true
+      sentinel.help: true
+      sentinel.log: true
+      sentinel.dump: true
+      sentinel.version: true
+      sentinel.debug: true
+      sentinel.spectate: true
+      sentinel.stopspectating: true
+      sentinel.testwebhook: true
+  sentinel.alerts:
+    default: op
+  sentinel.alerts.enable-on-join:
+    default: op
+  sentinel.performance:
+    default: op
+  sentinel.profile:
+    default: op
+  sentinel.brand:
+    default: op
+  sentinel.brand.enable-on-join:
+    default: op
+  sentinel.sendalert:
+    default: op
+  sentinel.verbose:
+    default: op
+  sentinel.list:
+    default: op
+  sentinel.history:
+    default: op
+  sentinel.reload:
+    default: op
+  sentinel.info:
+    default: op
+  sentinel.help:
+    default: op
+  sentinel.log:
+    default: op
+  sentinel.dump:
+    default: op
+  sentinel.version:
+    default: op
+  sentinel.debug:
+    default: op
+  sentinel.spectate:
+    default: op
+  sentinel.stopspectating:
+    default: op
+  sentinel.testwebhook:
+    default: op
+  sentinel.exempt:
+    default: false
+  sentinel.nosetback:
+    default: false
+  sentinel.nomodifypacket:
+    default: false
+  sentinel.disabled:
+    default: false
+  sentinel.verbose.enable-on-join:
+    default: false

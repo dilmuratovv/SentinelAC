@@ -1,0 +1,6 @@
+[submodule "upstream/engine"]
+	path = upstream/engine
+	url = https://github.com/GrimAnticheat/Grim.git
+[submodule "upstream/api"]
+	path = upstream/api
+	url = https://github.com/GrimAnticheat/GrimAPI.git
