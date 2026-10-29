@@ -22,7 +22,7 @@ def run_case(root, java, artifacts, sentinel, via, client_probes=False):
         shutil.rmtree(directory)
     plugins = directory / 'plugins'
     plugins.mkdir(parents=True)
-    for path in [artifacts['grim'], sentinel] + ([artifacts['viaversion'], artifacts['viabackwards']] if via else []):
+    for path in [sentinel] + ([artifacts['viaversion'], artifacts['viabackwards']] if via else []):
         shutil.copy2(path, plugins / path.name)
     for name in ['cache', 'libraries']:
         shared = root / ('shared-' + name)
@@ -65,32 +65,50 @@ def run_case(root, java, artifacts, sentinel, via, client_probes=False):
         process.stdin.write(value + '\n'); process.stdin.flush()
     try:
         wait_for('Done (')
-        command('sentinel info')
+        command('sac info')
         wait_for('Channel policy=')
-        command('sentinel reload')
-        wait_for('Grim va Sentinel konfiguratsiyasi yangilandi.')
+        command('sentinelac version')
+        wait_for('Releases: https://github.com/dilmuratovv/SentinelAC')
+        command('sentinel help')
+        wait_for('/sac recent')
+        command('sac reload')
+        wait_for('Config has been reloaded.')
         config = plugins / 'SentinelAC/config.yml'
         original = config.read_text()
         config.write_text(original.replace('max-crystals-per-second: 12', 'max-crystals-per-second: 0'))
-        command('sentinel reload')
-        wait_for('Reload bajarilmadi:')
+        command('sac reload')
+        wait_for('Failed to reload config.')
         config.write_text(original)
-        command('sentinel reload')
-        wait_for('Grim va Sentinel konfiguratsiyasi yangilandi.')
+        command('sac reload')
+        wait_for('Config has been reloaded.')
         if via and client_probes:
             result = subprocess.run(['node', str(Path(__file__).with_name('client') / 'probe.cjs'), str(port)],
                                     text=True, capture_output=True, timeout=100)
             print(result.stdout, end='', flush=True)
             if result.returncode:
                 raise RuntimeError('Protocol client checks failed: ' + result.stderr)
-        command('sentinel perf')
-        wait_for('Diagnostika: queued=')
+            result = subprocess.run(['node', str(Path(__file__).with_name('client') / 'movement.cjs'), str(port)],
+                                    text=True, capture_output=True, timeout=25)
+            print(result.stdout, end='', flush=True)
+            if result.returncode:
+                raise RuntimeError('Movement probe failed: ' + result.stderr)
+            command('sac info')
+            wait_for('Diagnostika: processed=')
+            logs = '\n'.join(path.read_text() for path in (plugins / 'SentinelAC/logs').glob('violations.*.log'))
+            if 'MovementProbe' not in logs or 'Simulation' not in logs:
+                raise RuntimeError('Impossible movement did not produce a core Simulation finding')
+        command('sac dump')
+        wait_for('SentinelAC: diagnostic saved to ')
+        command('sac perf')
+        wait_for('Milliseconds per prediction')
         command('stop')
         process.wait(timeout=40)
         if process.returncode != 0: raise RuntimeError('Server exit code ' + str(process.returncode))
         text = ''.join(captured)
         if 'Sentinel ready: Paper 26.2' not in text or 'Sentinel startup failed' in text:
             raise RuntimeError('Sentinel did not become ready')
+        if any(word in text for word in ['Failed to start ', 'Failed to load ', 'Failed to register commands']):
+            raise RuntimeError('Engine initializer reported a failure')
         print('PASS: ' + ('ViaVersion + ViaBackwards' if via else 'native') + ' startup/commands/reload', flush=True)
     finally:
         if process.poll() is None:
@@ -108,7 +126,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--accept-eula', action='store_true')
     parser.add_argument('--java', default=shutil.which('java'))
-    parser.add_argument('--sentinel', type=Path, default=Path('target/SentinelAC-2.4.0-paper26.2.jar'))
+    parser.add_argument('--sentinel', type=Path, default=Path('plugin/target/SentinelAC-2.5.0-paper26.2.jar'))
     parser.add_argument('--mode', choices=['native', 'via', 'both'], default='both')
     parser.add_argument('--client-probes', action='store_true', help='Requires npm ci --prefix tools/client')
     args = parser.parse_args()

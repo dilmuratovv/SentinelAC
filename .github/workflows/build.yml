@@ -23,13 +23,14 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
+          submodules: recursive
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: '25'
           cache: maven
       - run: mvn -B -ntp clean verify
-      - run: python3 tools/verify_artifact.py target/SentinelAC-2.4.0-paper26.2.jar
+      - run: python3 tools/verify_artifact.py plugin/target/SentinelAC-2.5.0-paper26.2.jar
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         if: github.event_name == 'workflow_dispatch' && inputs.smoke && inputs.accept_eula
         with:
@@ -43,8 +44,8 @@ jobs:
         with:
           name: SentinelAC-paper26.2
           path: |
-            target/SentinelAC-2.4.0-paper26.2.jar
-            target/surefire-reports/*.txt
+            plugin/target/SentinelAC-2.5.0-paper26.2.jar
+            plugin/target/surefire-reports/*.txt
             deployment/
             README.md
             docs/VALIDATION.md

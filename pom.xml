@@ -1,35 +1,88 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" ?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>uz.sentinel.ac</groupId><artifactId>SentinelAC</artifactId><version>2.4.0-paper26.2</version>
-  <name>SentinelAC</name><description>Paper 26.2 enforcement and diagnostics companion for GrimAC</description>
-  <licenses><license><name>GNU General Public License v3.0</name><url>https://www.gnu.org/licenses/gpl-3.0.html</url></license></licenses>
+  <groupId>uz.sentinel.ac</groupId>
+  <artifactId>sentinel-parent</artifactId>
+  <version>2.5.0-paper26.2</version>
+  <packaging>pom</packaging>
+  <name>SentinelAC standalone</name>
+  <modules>
+    <module>runtime</module>
+    <module>plugin</module>
+  </modules>
   <properties>
-    <maven.compiler.release>25</maven.compiler.release><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>25</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.build.outputTimestamp>2026-10-29T00:00:00Z</project.build.outputTimestamp>
-    <!-- Modrinth version ID pins the Bukkit 2.3.74 artifact; the number alone also matches Fabric. -->
-    <paper.version>26.2.build.135-stable</paper.version><grim.version>baDrVvfo</grim.version><junit.version>5.13.4</junit.version>
+    <paper.version>26.2.build.135-stable</paper.version>
   </properties>
   <repositories>
-    <repository><id>papermc</id><url>https://repo.papermc.io/repository/maven-public/</url></repository>
-    <repository><id>modrinth</id><url>https://api.modrinth.com/maven</url></repository>
+    <repository>
+      <id>central</id>
+      <url>https://repo.maven.apache.org/maven2</url>
+    </repository>
+    <repository>
+      <id>papermc</id>
+      <url>https://repo.papermc.io/repository/maven-public/</url>
+    </repository>
+    <repository>
+      <id>modrinth</id>
+      <url>https://api.modrinth.com/maven</url>
+    </repository>
+    <repository>
+      <id>papi</id>
+      <url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url>
+    </repository>
+    <repository>
+      <id>opencollab-release</id>
+      <url>https://repo.opencollab.dev/maven-releases/</url>
+    </repository>
+    <repository>
+      <id>opencollab-snapshot</id>
+      <url>https://repo.opencollab.dev/maven-snapshots/</url>
+    </repository>
   </repositories>
-  <dependencies>
-    <dependency><groupId>io.papermc.paper</groupId><artifactId>paper-api</artifactId><version>${paper.version}</version><scope>provided</scope></dependency>
-    <!-- Public API from the official release. Never shade a second Grim engine. -->
-    <dependency><groupId>maven.modrinth</groupId><artifactId>grimac</artifactId><version>${grim.version}</version><scope>provided</scope></dependency>
-    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>${junit.version}</version><scope>test</scope></dependency>
-    <dependency><groupId>org.mockito</groupId><artifactId>mockito-core</artifactId><version>5.20.0</version><scope>test</scope></dependency>
-  </dependencies>
   <build>
-    <resources><resource><directory>src/main/resources</directory><filtering>true</filtering></resource></resources>
-    <plugins>
-      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.1</version></plugin>
-      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.4</version>
-        <configuration><argLine>-javaagent:${settings.localRepository}/org/mockito/mockito-core/5.20.0/mockito-core-5.20.0.jar</argLine></configuration>
-      </plugin>
-      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><version>3.4.2</version></plugin>
-      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-enforcer-plugin</artifactId><version>3.6.2</version><executions><execution><id>java25</id><goals><goal>enforce</goal></goals><configuration><rules><requireJavaVersion><version>[25,)</version></requireJavaVersion></rules></configuration></execution></executions></plugin>
-    </plugins>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.14.1</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>3.5.4</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>3.4.2</version>
+          <configuration>
+            <archive>
+              <addMavenDescriptor>false</addMavenDescriptor>
+            </archive>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-shade-plugin</artifactId>
+          <version>3.6.1</version>
+          <dependencies>
+            <dependency>
+              <groupId>org.ow2.asm</groupId>
+              <artifactId>asm</artifactId>
+              <version>9.8</version>
+            </dependency>
+            <dependency>
+              <groupId>org.ow2.asm</groupId>
+              <artifactId>asm-commons</artifactId>
+              <version>9.8</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+      </plugins>
+    </pluginManagement>
   </build>
 </project>
