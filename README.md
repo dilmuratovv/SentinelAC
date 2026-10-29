@@ -1,88 +1,169 @@
-# SentinelAC — Paper 26.2
+<div align="center">
 
-[GitHub release va JAR yuklamasi](https://github.com/dilmuratovv/SentinelAC/releases/tag/v2.5.0-paper26.2).
+# SentinelAC
 
-**Bitta JAR: `SentinelAC-2.5.0-paper26.2.jar`. Paper 26.2 va Java 25 uchun.** Harakat, Reach, Timer, Knockback va paket tekshiruvlari ichki prediction yadrosida ishlaydi. Sentinel kanal blacklisti, crystal/anchor tezlik qoidalari va chegaralangan diagnostikani qo‘shadi.
+### Fair play starts with a stronger server.
 
-## O‘rnatish
+A Minecraft anticheat project by **azicoo**, built around server-side prediction, configurable enforcement, and practical tools for server administrators.
 
-1. Server va eski konfiguratsiya/database fayllarining nusxasini oling. Eski Sentinel va alohida GrimAC JAR’larini `plugins/`dan chiqaring; ushbu build ichida yadro bor.
-2. Build natijasidagi **faqat SentinelAC JAR**ni `plugins/`ga qo‘ying. Eski konfiguratsiyani avtomatik ko‘chirib qo‘ymang; yangi standartlar bilan solishtiring. Oldingi forkning tarix bazasi uchun avtomatik migratsiya va’da qilinmaydi.
-3. Via kerak bo‘lsa, ViaVersion/ViaBackwards’ni **backend Paper serverga** o‘rnating. Sinov juftligi: **5.12.2 / 5.12.2**. Proxy’dagi ViaVersion qo‘llanmaydi.
-4. Restart qiling. Konsolda `Sentinel ready: Paper 26.2` va `/sac info` natijasini tekshiring.
+[![Build](https://github.com/dilmuratovv/SentinelAC/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/dilmuratovv/SentinelAC/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/dilmuratovv/SentinelAC?color=ec4899&label=release)](https://github.com/dilmuratovv/SentinelAC/releases)
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Author](https://img.shields.io/badge/author-azicoo-8b5cf6.svg)](https://github.com/dilmuratovv/SentinelAC)
 
-Barcha sozlamalar `plugins/SentinelAC/` ichida: `config.yml`, `messages.yml`, `punishments.yml`, `database.yml`, `databases/`, `discord.yml`. `sentinel.admin` boshqaruv huquqlarini beradi. Exemption huquqlari defaultda **false**; administrator bo‘lish avtomatik exemption bermaydi.
+[Download](https://github.com/dilmuratovv/SentinelAC/releases) · [Installation](#installation) · [Commands](#commands) · [Compatibility](#compatibility) · [Validation](docs/VALIDATION.md)
 
-## Buyruqlar
+</div>
 
-Asosiy buyruq **`/sac`**, aliaslar **`/sentinel`**, **`/sentinelac`**. Bitta command manager ishlatiladi.
+---
 
-| Buyruq | Vazifa | Ruxsat |
-|---|---|---|
-| `/sac help` | Yadro va boshqaruv yordami | `sentinel.help` |
-| `/sac info` | Build, Via va diagnostika holati | `sentinel.info` |
-| `/sac alerts`, `/sac verbose` | Tekshiruv xabarlari | `sentinel.alerts`, `sentinel.verbose` |
-| `/sac profile <player>` | Klient va tracking ma’lumoti | `sentinel.profile` |
-| `/sac channels <player>` | Klient e’lon qilgan kanallar | `sentinel.profile` |
-| `/sac recent <player>` | Oxirgi mahalliy diagnostika yozuvlari | `sentinel.history` |
-| `/sac history <player>` | Bazadagi session va violation tarixi | `sentinel.history` |
-| `/sac perf` | Prediction hisoblash vaqti | `sentinel.performance` |
-| `/sac reload` | Sozlamalarni tekshirib qayta yuklash | `sentinel.reload` |
-| `/sac version` | Haqiqiy build versiyasi | `sentinel.version` |
-| `/sac log <id>`, `/sac dump` | Server diskiga diagnostika saqlash | `sentinel.log`, `sentinel.dump` |
+## About
 
-## Qoidalar va cheklovlar
+SentinelAC combines a prediction-based anticheat engine with server policy controls and bounded diagnostics in **one plugin JAR**. Movement, combat, packet behavior, and server rules are managed through a shared lifecycle and the `/sac` command tree.
 
-`mod-sentinel` kirishda mavjud kanallarni va keyingi kanal ro‘yxatdan o‘tishlarini tekshiradi. Blacklistdagi **exact kanal yoki namespace** aniqlansa kick qiladi. `baritone:channel` mos keladi; `notbaritone:main` mos kelmaydi. `/sac channels` o‘rnatilgan barcha modlar ro‘yxati emas: kanalini yashirgan modlarni server to‘liq aniqlay olmaydi. Blacklist ro‘yxati server siyosatiga moslab tahrirlanadi.
+The project is being developed for **multiple Minecraft versions**. Support will expand through dedicated compatibility work and testing; use each release's compatibility information when choosing a build.
 
-Crystal/anchor cheklovlari bir soniyalik siljiydigan oynadan foydalanadi. Ikkala qo‘l crystal limitini birga ishlatadi. Limitdan oshgan amal bekor qilinadi; bu o‘zicha cheat isboti yoki doimiy ban sababi emas. Eski 90 ms AutoTotem, qo‘shimcha exhaustion beradigan NoHunger va zaif event Reach/FastEat detektorlari qaytarilmagan.
+**Created and maintained by azicoo.**
 
-`deployment/SentinelAC/punishments.yml` — **ixtiyoriy** takroriy flaglarda kick beruvchi profil. Avval staging’da tekshiring; u avtomatik o‘rnatilmaydi va doimiy ban bermaydi. Fizika tekshiruvlarining setback/cancellation himoyasi standart konfiguratsiyada saqlanadi.
+## Features
 
-ViaBackwards bilan eski klientlarning vehicle/fizika mosligi cheklangan; upstream’ning 1.21.2+ serverlar haqidagi ogohlantirishi saqlangan. Ulanish testi barcha mexanikalarning tasdig‘i emas. To‘liq native 26.2 o‘yin sessiyalari, katta online va cheat-client sinovlari alohida talab qilinadi. Nol lag, nol false positive yoki barcha cheatlarni 100% aniqlash kafolati berilmaydi.
-
-## Manba va o‘zgarishlar
-
-Yadro **[GrimAC](https://github.com/GrimAnticheat/Grim)** asosida manba kodidan yig‘iladi. GrimAPI ham manbadan kompilyatsiya qilinadi; alohida tayyor engine binari ko‘chirilmaydi. Asl kodlar commitga pin qilingan submodule’larda saqlanadi. Build generator port va o‘zgarishlarni ochiq ko‘rsatadi.
-
-| Manba | Pin |
+| Area | What SentinelAC provides |
 |---|---|
-| Yadro v2.3.74 | `f31ba923100d9a991939d7ea24fde541d6fa2929` |
-| API 1.6.0.13 | `e9ae70ad6e13af0f3dab02ac849608443fb69f8a` |
-| Paper API | `26.2.build.135-stable` |
+| **Movement prediction** | Server-side movement simulation, with checks for impossible movement, timing, and velocity behavior. |
+| **Combat & packets** | Reach, hitbox, knockback, packet-order, and malformed-packet checks from the integrated engine. |
+| **Channel blacklist** | Configurable exact-channel and namespace rules, checked on join and later channel registrations, with optional kicks. |
+| **Action limits** | Sliding-window crystal and respawn-anchor policies, including a shared crystal budget for both hands. |
+| **Staff tools** | Alerts, profiles, recent findings, persistent history, prediction timing, and configuration reloads. |
+| **Bounded diagnostics** | Limited queues and in-memory history, rotating disk logs, and local debug dumps. |
+| **Optional Discord alerts** | Administrator-configured webhooks with a bounded queue, finite request lifetime, and limited rate-limit retries. |
+| **Source transparency** | Pinned engine/API sources, a documented build process, automated tests, and artifact verification. |
 
-`runtime/` faqat hash bilan tekshirilgan upstream distribution ichidagi uchinchi tomon kutubxonalari va protokol assetlarini oladi. Yadro/API klasslari chiqarib tashlanadi; compatibility shim ham manbadan qayta yig‘iladi. Bu exact PacketEvents snapshot va minimallashtirilgan kutubxonalarni qayta ishlatish uchun tanlangan. Kutubxona namespace’lari va serialized-lambda descriptorlari izchil ko‘chiriladi.
+## Installation
 
-Qo‘shilgan o‘zgarishlar:
+1. Download the appropriate JAR from [Releases](https://github.com/dilmuratovv/SentinelAC/releases), checking the supported server and Java versions.
+2. Back up your server, configuration, and history databases.
+3. Remove previous SentinelAC builds and any separately installed GrimAC engine JAR. SentinelAC already includes its engine.
+4. Place the SentinelAC JAR in your server's `plugins/` directory and restart.
+5. Check the startup log, then run `/sac info`.
 
-- Paket/fizika tekshiruvlarini o‘chirmasdan ray hisoblashdagi vaqtinchalik vektor olib tashlandi. Natijalar 25 000 tasodifiy holat va chegaraviy holatlarda asl arifmetika bilan bit darajasida solishtiriladi. Global TPS oshishi o‘lchangan deb da’vo qilinmaydi.
-- Discord navbati 256 so‘rov bilan cheklangan; bir vaqtda bitta yuborish, 60 soniya navbat muddati, rate-limit uchun ko‘pi bilan uch urinish. Network xatosi navbat boshini cheksiz ushlab turmaydi. Webhook defaultda o‘chiq va faqat administrator sozlagan manzilga yuboradi.
-- Diagnostika navbati/xotira tarixi cheklangan, disk loglari hajm va son bo‘yicha aylanadi. Dump/debug fayllari lokal, ko‘pi bilan 20 fayl va har biri 2 MiB. bStats va upstream update/paste xizmatlariga avtomatik murojaat olib tashlangan.
-- Kanal qoidalari immutable; noto‘g‘ri Sentinel sozlamalari reload’dan oldin rad etiladi. Buffer/log hajmini o‘zgartirish restart talab qiladi. Yadro reload xatosidan keyin konsol tekshiriladi; barcha subsystemlar uchun to‘liq transaction kafolati berilmaydi.
+Configuration lives in **`plugins/SentinelAC/`**. Review the generated defaults before copying settings from an older build. Automatic migration of configurations or databases from previous modified binaries is not guaranteed.
 
-## Yig‘ish va tekshirish
+For protocol translation, install the compatible **ViaVersion and ViaBackwards plugins on the backend Paper server**. Proxy-side ViaVersion is outside the current support scope.
 
-JDK 25, Maven 3.9+, Python 3 va Git:
+## Commands
+
+**Main command:** `/sac`  
+**Aliases:** `/sentinel`, `/sentinelac`
+
+| Command | Purpose |
+|---|---|
+| `/sac help` | View command help. |
+| `/sac info` | Show build, translation-plugin, and diagnostic status. |
+| `/sac alerts` · `/sac verbose` | Control staff notifications. |
+| `/sac profile <player>` | Inspect tracked client information. |
+| `/sac channels <player>` | Inspect advertised plugin channels and matching rules. |
+| `/sac recent <player>` | View recent local findings. |
+| `/sac history <player>` | Browse stored sessions and violations. |
+| `/sac perf` | View prediction timing. |
+| `/sac reload` | Reload configuration with Sentinel policy validation. |
+| `/sac version` | Show the build version. |
+| `/sac log <id>` · `/sac dump` | Save diagnostics locally. |
+
+<details>
+<summary><strong>Permissions</strong></summary>
+
+`sentinel.admin` grants administrative commands. Exemption permissions default to **false**; administrative access does not automatically exempt a player from checks.
+
+| Permission | Access |
+|---|---|
+| `sentinel.help`, `sentinel.info`, `sentinel.version` | Help and status commands. |
+| `sentinel.alerts`, `sentinel.verbose` | Staff notifications. |
+| `sentinel.profile` | Player profiles and channels. |
+| `sentinel.history` | Recent findings and stored history. |
+| `sentinel.performance` | Prediction timing. |
+| `sentinel.reload` | Configuration reload. |
+| `sentinel.log`, `sentinel.dump` | Diagnostic files. |
+| `sentinel.exempt` | Exemption from engine checks and Sentinel policies. |
+
+</details>
+
+## Compatibility
+
+SentinelAC's roadmap covers multiple Minecraft versions. **Compatibility is established per release, rather than assumed across every version.**
+
+| Component | Current published build |
+|---|---|
+| Release | [2.5.0-paper26.2](https://github.com/dilmuratovv/SentinelAC/releases/tag/v2.5.0-paper26.2) |
+| Server | Paper 26.2 |
+| Java | 25 |
+| Translation plugins tested | ViaVersion 5.12.2 + ViaBackwards 5.12.2 |
+| Translated clients exercised | 1.21.11 and 26.1 |
+| Additional server versions | Planned; implementation and validation will follow. |
+
+Translated-client login and enforcement probes do not certify every gameplay mechanic. Older-client vehicle behavior remains subject to the documented ViaBackwards limitations. Other server versions and Folia are not certified by the current release.
+
+See [Validation](docs/VALIDATION.md) for the exact test coverage and remaining staging work.
+
+## Configuration & enforcement
+
+- **Channel rules:** Match exact identifiers or namespaces. A matching advertised channel can trigger a kick. Clients can hide channels, so this feature is not a complete inventory of installed mods.
+- **Action limits:** Excess crystal or anchor actions are cancelled according to server policy. Exceeding a rate limit alone is not proof of cheating.
+- **Punishments:** An [optional kick-oriented profile](deployment/SentinelAC/punishments.yml) is provided for staging and calibration. It is not installed automatically and does not apply permanent bans.
+- **Reloads:** Invalid Sentinel policy settings are rejected before application. Diagnostic buffer/log-size changes require a restart; inspect the console if an engine subsystem fails to reload.
+- **Diagnostics:** Logs rotate by size and count. Debug dumps remain on the server. Webhooks are disabled by default, and no bStats or upstream update/paste requests are started by SentinelAC.
+
+Test new builds and punishment thresholds on a staging server with your plugin set. Detection coverage and resource use depend on gameplay, network conditions, and configuration; zero lag, zero false positives, and universal cheat detection are not guaranteed.
+
+## Build from source
+
+For the current branch, use **JDK 25**, **Maven 3.9+**, **Python 3**, and **Git**.
 
 ```sh
 git clone --recurse-submodules https://github.com/dilmuratovv/SentinelAC.git
 cd SentinelAC
 git submodule update --init --recursive
 mvn -B -ntp clean verify
-python3 tools/verify_artifact.py plugin/target/SentinelAC-2.5.0-paper26.2.jar
+python3 tools/verify_artifact.py
 ```
 
-Natija: `plugin/target/SentinelAC-2.5.0-paper26.2.jar`. Verifier arxiv tuzilishi, barcha backend shablonlari, Java 25 bytecode, litsenziyalar va faol klass/matnlarda eski branding qolmaganini tekshiradi.
+The plugin JAR is produced in `plugin/target/`. Choose the JAR named `SentinelAC-<version>.jar`.
 
-Izolyatsiyalangan localhost server sinovi:
+<details>
+<summary><strong>Build architecture</strong></summary>
+
+- `upstream/engine` and `upstream/api` preserve the pinned original sources.
+- `tools/generate_engine.py` produces the Sentinel source port and explicit modifications during the build.
+- `plugin/` compiles the engine, APIs, compatibility shim, and Sentinel modules from source.
+- `runtime/` extracts third-party libraries and protocol assets from a hash-verified distribution. Engine/API bytecode and the source-built shim are excluded from that carrier.
+- Artifact verification checks required resources, codec metadata, core bytecode, duplicate entries, legal notices, and active branding.
+
+The current release passed **76 automated tests**, artifact verification, and localhost server/protocol probes. The ray arithmetic change is checked against the original over 25,000 random cases and boundary cases; this is not a claim of measured global TPS improvement.
+
+</details>
+
+Optional localhost smoke tests:
 
 ```sh
 npm ci --prefix tools/client
 python3 tools/smoke_paper.py --accept-eula --client-probes --java /path/to/jdk-25/bin/java
 ```
 
-`--accept-eula`ni [Minecraft EULA](https://www.minecraft.net/eula)ni qabul qilgan bo‘lsangiz bering. Testlar `target/smoke/`da ishlaydi va production serverga ulanmaydi. Aniq qamrov: [docs/VALIDATION.md](docs/VALIDATION.md).
+Pass `--accept-eula` only after accepting the [Minecraft EULA](https://www.minecraft.net/eula). These tests use temporary localhost servers, not a production server.
 
-## Minnatdorchilik va litsenziya
+## Roadmap
 
-Sentinel modullari: **azicoo**. **GrimAC, DefineOutside va barcha GrimAnticheat/GrimAPI mualliflariga rahmat.** Litsenziya: [GPL-3.0](LICENSE). Asl copyright va litsenziya yozuvlari submodule’larda va JAR ichidagi `META-INF/NOTICE.txt`, `META-INF/LICENSE.txt`, `META-INF/licenses/`da saqlangan. Grim nomi shu huquqiy/manba yozuvlarida qoladi; faol nomlar, buyruqlar, permissionlar va engine namespace’lari SentinelAC’ga o‘tkazilgan.
+- [x] Integrate the prediction engine and Sentinel policies into one plugin.
+- [x] Unify commands, permissions, and active branding.
+- [x] Add bounded diagnostics, webhook handling, and automated release verification.
+- [x] Publish the first source-buildable server target.
+- [ ] Add and validate further Minecraft server versions.
+- [ ] Expand client-version and gameplay compatibility testing.
+- [ ] Profile sustained load and test against a broader controlled cheat-client suite.
+
+## Credits & license
+
+**SentinelAC — created and maintained by azicoo.**
+
+The integrated engine is derived from **[GrimAC](https://github.com/GrimAnticheat/Grim)**, with APIs from **[GrimAPI](https://github.com/GrimAnticheat/GrimAPI)**. Thank you to **DefineOutside and all upstream contributors**, and to the maintainers of the third-party libraries used by this project.
+
+Distributed under **[GPL-3.0](LICENSE)**. Original copyright and license notices remain in the source submodules and the JAR's `META-INF/NOTICE.txt`, `META-INF/LICENSE.txt`, and `META-INF/licenses/` entries.
