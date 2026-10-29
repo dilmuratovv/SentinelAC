@@ -1,12 +1,11 @@
 {
-  "tag": "v2.5.0-paper26.2",
-  "name": "SentinelAC 2.5.0 — Paper 26.2",
-  "artifact": "plugin/target/SentinelAC-2.5.0-paper26.2.jar",
-  "sha256": "744a4d5d19722f228be9a90ac18f9bd626f0c98fbffd10100fc2071aef29bcfb",
-  "notes": "docs/RELEASE-2.5.0.md",
+  "version": "2.6.0",
+  "tag": "v2.6.0",
+  "name": "SentinelAC 2.6.0 \u2014 Separate Paper Builds",
+  "notes": "docs/RELEASE-2.6.0.md",
   "prerelease": false,
-  "cleanup_branches": {
-    "codex/paper-26.2-hardening": "9e6c6033d0102befed8e9bd64f1ec60aaa3408f7",
-    "codex/standalone-sentinel-26.2": "1af2ce55480b789c3e23886d73e5150d74154474"
-  }
+  "assets_directory": "release-assets",
+  "cleanup_branches": [
+    "codex/multi-version-2.6"
+  ]
 }
