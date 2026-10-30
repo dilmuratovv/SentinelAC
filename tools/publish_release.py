@@ -79,19 +79,3 @@ else:
         asset = next(item for item in release['assets'] if item['name'] == path.name)
         assert asset.get('digest') == 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
 print('Published complete matrix: ' + release['html_url'])
-
-# Remove only this project's merged work branch; retain any later unmerged work.
-for branch in config.get('cleanup_branches', []):
-    assert branch.startswith('codex/')
-    reference = '/git/ref/heads/' + urllib.parse.quote(branch, safe='/')
-    try:
-        ref = api('GET', reference)
-    except urllib.error.HTTPError as error:
-        if error.code == 404: continue
-        raise
-    comparison = api('GET', '/compare/' + ref['object']['sha'] + '...' + revision)
-    if comparison['behind_by'] != 0:
-        print('Preserved branch with unmerged work: ' + branch)
-        continue
-    api('DELETE', '/git/refs/heads/' + urllib.parse.quote(branch, safe='/'))
-    print('Removed merged work branch: ' + branch)

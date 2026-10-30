@@ -1,11 +1,4 @@
 {
-  "paper": {
-    "version": "26.2-135",
-    "filename": "paper-26.2-135.jar",
-    "url": "https://fill-data.papermc.io/v1/objects/ef3dbc68b013deafdbbee3bebf1ba351671ebcda94a8f136809b7532d5ba2fe1/paper-26.2-135.jar",
-    "hash": "sha256",
-    "checksum": "ef3dbc68b013deafdbbee3bebf1ba351671ebcda94a8f136809b7532d5ba2fe1"
-  },
   "grim": {
     "version": "2.3.74",
     "version_id": "baDrVvfo",
