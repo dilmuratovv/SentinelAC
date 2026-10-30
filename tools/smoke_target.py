@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 import urllib.request
 from download_test_dependencies import download
-from smoke_paper import run_case
+from server_smoke import run_case
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--target', required=True)

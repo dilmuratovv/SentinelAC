@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Isolated localhost Paper boot/command tests. Does not touch a production server.
-
-Requires explicit --accept-eula: https://www.minecraft.net/eula .
-The process uses an offline temporary test world and optional Via plugins.
-"""
-import argparse
+"""Shared localhost server probes; run through smoke_target.py with --accept-eula."""
 import os
 import json
 from pathlib import Path
@@ -16,7 +11,6 @@ import threading
 import time
 import urllib.parse
 import zipfile
-from download_test_dependencies import download
 
 def run_case(root, java, artifacts, sentinel, via, client_probes=False, target=None, shared_root=None):
     if target is None:
@@ -147,19 +141,3 @@ def run_case(root, java, artifacts, sentinel, via, client_probes=False, target=N
 def java_truststore(java):
     system = Path('/etc/ssl/certs/java/cacerts')
     return str(system if system.exists() else Path(java).resolve().parent.parent / 'lib/security/cacerts')
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--accept-eula', action='store_true')
-    parser.add_argument('--java', default=shutil.which('java'))
-    parser.add_argument('--sentinel', type=Path, default=Path('plugin/target/SentinelAC-2.6.0-paper26.2.jar'))
-    parser.add_argument('--mode', choices=['native', 'via', 'both'], default='both')
-    parser.add_argument('--client-probes', action='store_true', help='Requires npm ci --prefix tools/client')
-    args = parser.parse_args()
-    if not args.accept_eula:
-        parser.error('Read https://www.minecraft.net/eula and pass --accept-eula to run a test server')
-    artifacts = download(Path('target/test-dependencies'))
-    root = Path('target/smoke').resolve()
-    root.mkdir(parents=True, exist_ok=True)
-    for via in ([False, True] if args.mode == 'both' else [args.mode == 'via']):
-        run_case(root, args.java, artifacts, args.sentinel.resolve(), via, args.client_probes)

@@ -49,5 +49,3 @@ CI uploads `verification-paper<VERSION>.json`, the target JAR, unit-test output 
 ## Remaining limits
 
 Full gameplay sessions, vehicles/elytra/PvP, unusual physics changes from other plugins, high ping/low TPS and sustained high-online profiling require staging tests. ViaBackwards vehicle limitations remain. Channel blacklisting observes advertised channels and cannot enumerate every hidden mod. Rate policies are server rules rather than standalone proof of cheating; the optional kick profile needs calibration.
-
-The earlier single-target release's evidence is retained in [VALIDATION-2.5.0.md](VALIDATION-2.5.0.md).
