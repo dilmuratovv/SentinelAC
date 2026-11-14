@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish a complete matrix atomically: all verified JARs first, then public release."""
+"""Publish the single JAR atomically, only after it passed on every supported Paper version."""
 import hashlib
 import json
 import os
@@ -30,12 +30,16 @@ def api(method, path, body=None, raw=None, content_type=None):
         return json.loads(result) if result else None
 
 folder = Path(config['assets_directory'])
-assets, reports, sums = [], [], []
+path = folder / f'SentinelAC-{config["version"]}-paper.jar'
+digest = hashlib.sha256(path.read_bytes()).hexdigest()
+with zipfile.ZipFile(path) as jar:
+    metadata = dict(line.split('=',1) for line in jar.read('sentinel-target.properties').decode().splitlines() if '=' in line)
+assert metadata['minecraft.versions'].split(',') == [server['version'] for server in servers], 'JAR does not list the pinned matrix'
+reports = []
 for server in servers:
     target = server['version']
-    path = folder / f'SentinelAC-{config["version"]}-paper{target}.jar'
     report = json.loads((folder / f'verification-paper{target}.json').read_text())
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    # The very same JAR must have passed on every target.
     assert report['target'] == target and report['sha256'] == digest and report['jar'] == path.name
     assert report['paper_build'] == server['build'] and report['java'] == server['java']
     assert report['result'] == 'passed' and report['native_server'] and report['via_server'] and report['translated_client_probes']
@@ -43,11 +47,9 @@ for server in servers:
     assert all(report['unit_tests'][key] == 0 for key in ['failures','errors','skipped'])
     if target.startswith('1.21'):
         assert report['native_client_probes'], 'Native legacy protocol was not exercised'
-    with zipfile.ZipFile(path) as jar:
-        metadata = dict(line.split('=',1) for line in jar.read('sentinel-target.properties').decode().splitlines() if '=' in line)
-        assert metadata['minecraft.version'] == target and int(metadata['java.version']) == server['java']
-    assets.append(path); reports.append(report); sums.append(digest + '  ' + path.name)
-assert len(list(folder.glob('*.jar'))) == len(servers), 'Unexpected or missing target JAR'
+    reports.append(report)
+assert len(list(folder.glob('*.jar'))) == 1, 'Unexpected or missing JAR'
+assets = [path]; sums = [digest + '  ' + path.name]
 checksums = folder / 'SHA256SUMS.txt'; checksums.write_text('\n'.join(sums)+'\n')
 verification = folder / 'VERIFICATION.json'
 verification.write_text(json.dumps({'commit': revision, 'version': config['version'], 'targets': reports}, indent=2)+'\n')
@@ -78,4 +80,4 @@ else:
     for path in assets:
         asset = next(item for item in release['assets'] if item['name'] == path.name)
         assert asset.get('digest') == 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
-print('Published complete matrix: ' + release['html_url'])
+print('Published: ' + release['html_url'])

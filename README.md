@@ -19,9 +19,9 @@ A Minecraft anticheat project by **azicoo**, built around server-side prediction
 
 ## About
 
-SentinelAC combines a prediction-based anticheat engine with server policy controls and bounded diagnostics. **Each Paper server version has its own standalone JAR**, with its exact target checked at startup. Movement, combat, packet behavior, and server rules are managed through a shared lifecycle and the `/sac` command tree.
+SentinelAC combines a prediction-based anticheat engine with server policy controls and bounded diagnostics. **One standalone JAR runs on every supported Paper version (1.21 to 26.3)**, and checks the server version at startup. Movement, combat, packet behavior, and server rules are managed through a shared lifecycle and the `/sac` command tree.
 
-Version-specific builds cover the published Paper targets in the compatibility table below. Choose the file matching your server version; the engine is included in each build.
+The JAR is compiled once against the oldest supported Paper API; CI then links it against, and boots it on, every supported version before a release is published. The engine is included in the JAR.
 
 **Created and maintained by azicoo.**
 
@@ -40,7 +40,7 @@ Version-specific builds cover the published Paper targets in the compatibility t
 
 ## Installation
 
-1. Download the appropriate JAR from [Releases](https://github.com/dilmuratovv/SentinelAC/releases), checking the supported server and Java versions.
+1. Download `SentinelAC-<version>-paper.jar` from [Releases](https://github.com/dilmuratovv/SentinelAC/releases). Check the supported server and Java versions below.
 2. Back up your server, configuration, and history databases.
 3. Remove previous SentinelAC builds and any separately installed GrimAC engine JAR. SentinelAC already includes its engine.
 4. Place the SentinelAC JAR in your server's `plugins/` directory and restart.
@@ -89,29 +89,31 @@ For protocol translation, install the compatible **ViaVersion and ViaBackwards p
 
 ## Compatibility
 
-Release **2.6.0** provides separate builds for these exact targets. Each goes through its own API compilation, unit tests, artifact inspection and native/Via server probes before publication.
+Release **2.7.0** is a single JAR, `SentinelAC-2.7.0-paper.jar`, for these exact Paper versions. Each one is covered by an API link check, native and Via server probes and the unit tests before publication.
 
-| Paper version | JAR filename | Java | Paper build/channel |
-|---|---|---|---|
-| 1.21 | `SentinelAC-2.6.0-paper1.21.jar` | 21 | 130 (STABLE) |
-| 1.21.1 | `SentinelAC-2.6.0-paper1.21.1.jar` | 21 | 133 (STABLE) |
-| 1.21.3 | `SentinelAC-2.6.0-paper1.21.3.jar` | 21 | 83 (STABLE) |
-| 1.21.4 | `SentinelAC-2.6.0-paper1.21.4.jar` | 21 | 232 (STABLE) |
-| 1.21.5 | `SentinelAC-2.6.0-paper1.21.5.jar` | 21 | 114 (ALPHA) |
-| 1.21.6 | `SentinelAC-2.6.0-paper1.21.6.jar` | 21 | 48 (STABLE) |
-| 1.21.7 | `SentinelAC-2.6.0-paper1.21.7.jar` | 21 | 32 (STABLE) |
-| 1.21.8 | `SentinelAC-2.6.0-paper1.21.8.jar` | 21 | 60 (STABLE) |
-| 1.21.9 | `SentinelAC-2.6.0-paper1.21.9.jar` | 21 | 59 (ALPHA) |
-| 1.21.10 | `SentinelAC-2.6.0-paper1.21.10.jar` | 21 | 130 (STABLE) |
-| 1.21.11 | `SentinelAC-2.6.0-paper1.21.11.jar` | 21 | 132 (STABLE) |
-| 26.1.1 | `SentinelAC-2.6.0-paper26.1.1.jar` | 25 | 29 (ALPHA) |
-| 26.1.2 | `SentinelAC-2.6.0-paper26.1.2.jar` | 25 | 74 (STABLE) |
-| 26.2 | `SentinelAC-2.6.0-paper26.2.jar` | 25 | 135 (STABLE) |
-| 26.3 | `SentinelAC-2.6.0-paper26.3.jar` | 25 | 230 (STABLE) |
+| Paper version | Java (needed by the server) | Tested Paper build/channel |
+|---|---|---|
+| 1.21 | 21 | 130 (STABLE) |
+| 1.21.1 | 21 | 133 (STABLE) |
+| 1.21.3 | 21 | 83 (STABLE) |
+| 1.21.4 | 21 | 232 (STABLE) |
+| 1.21.5 | 21 | 114 (ALPHA) |
+| 1.21.6 | 21 | 48 (STABLE) |
+| 1.21.7 | 21 | 32 (STABLE) |
+| 1.21.8 | 21 | 60 (STABLE) |
+| 1.21.9 | 21 | 59 (ALPHA) |
+| 1.21.10 | 21 | 130 (STABLE) |
+| 1.21.11 | 21 | 132 (STABLE) |
+| 26.1.1 | 25 | 29 (ALPHA) |
+| 26.1.2 | 25 | 74 (STABLE) |
+| 26.2 | 25 | 135 (STABLE) |
+| 26.3 | 25 | 230 (STABLE) |
 
-**Unavailable names:** Paper has no published 1.21.2 or exactly 26.1 server build. The 26.1 line is covered through its published 26.1.1 and 26.1.2 versions. ALPHA labels above describe the official Paper builds and are not a claim of Paper stability.
+The JAR itself is Java 21 bytecode, so it runs on Java 21 (Paper 1.21.x) and Java 25 (Paper 26.x). Install the same file on all of them.
 
-ViaVersion/ViaBackwards 5.12.2 are used in the translation tests. Native wire-protocol tests run where a matching client codec is available; full gameplay compatibility is not inferred from login and enforcement probes. Other server versions and Folia are outside this matrix.
+**Unavailable names:** Paper has no published 1.21.2 or exactly 26.1 server build. The 26.1 line is covered through its published 26.1.1 and 26.1.2 versions. Any version not in the table, newer or older, is refused at startup with a clear message. ALPHA labels above describe the official Paper builds and are not a claim of Paper stability.
+
+ViaVersion/ViaBackwards 5.12.2 are used in the translation tests. Native wire-protocol tests run where a matching client codec is available; full gameplay compatibility is not inferred from login and enforcement probes. Other server versions, Paper before 1.21 and Folia are outside this matrix.
 
 See [Validation](docs/VALIDATION.md) and the release's `VERIFICATION.json` for exact coverage and staging limits.
 
@@ -127,17 +129,26 @@ Test new builds and punishment thresholds on a staging server with your plugin s
 
 ## Build from source
 
-Use **Maven 3.9+**, **Python 3**, and **Git**. Select **JDK 21** for a 1.21.x profile or **JDK 25** for a 26.x profile. Each profile pins the matching Paper API and target metadata.
+Use **Maven 3.9+**, **Python 3**, **Git** and **JDK 21** (a newer JDK also works; the JAR targets Java 21).
 
 ```sh
 git clone --recurse-submodules https://github.com/dilmuratovv/SentinelAC.git
 cd SentinelAC
 git submodule update --init --recursive
-mvn -B -ntp -Ppaper-1.21.11 clean verify
-python3 tools/verify_artifact.py plugin/target/SentinelAC-2.6.0-paper1.21.11.jar
+mvn -B -ntp clean verify
+python3 tools/verify_artifact.py
 ```
 
-Replace `paper-1.21.11` with the required profile, such as `paper-26.3`. Output: `plugin/target/SentinelAC-2.6.0-paper<VERSION>.jar`. The default profile targets Paper 26.2. Never install multiple Sentinel builds on the same server.
+Output: `plugin/target/SentinelAC-2.7.0-paper.jar`. The build compiles against the Paper 1.21 API. The `paper-<version>` Maven profiles only select another API to check the JAR against, they do not produce a different JAR. Never install multiple Sentinel builds on the same server.
+
+To check the JAR against another Paper version (JDK 25 for 26.x):
+
+```sh
+python3 tools/api_compat.py --extract-only --jar plugin/target/SentinelAC-2.7.0-paper.jar --refs-cache refs.tsv
+mvn -B -ntp -q -f tools/api-classpath/pom.xml dependency:build-classpath -Dpaper.version=1.21-R0.1-SNAPSHOT -Dmdep.outputFile="$PWD/baseline.txt"
+mvn -B -ntp -q -f tools/api-classpath/pom.xml dependency:build-classpath -Dpaper.version="$(python3 tools/paper_version.py 26.3)" -Dmdep.outputFile="$PWD/target.txt"
+python3 tools/api_compat.py --jar plugin/target/SentinelAC-2.7.0-paper.jar --refs-cache refs.tsv --baseline-classpath "$(cat baseline.txt)" --classpath "$(cat target.txt)"
+```
 
 <details>
 <summary><strong>Build architecture</strong></summary>
@@ -148,7 +159,7 @@ Replace `paper-1.21.11` with the required profile, such as `paper-26.3`. Output:
 - `runtime/` extracts third-party libraries and protocol assets from a hash-verified distribution. Engine/API bytecode and the source-built shim are excluded from that carrier.
 - Artifact verification checks required resources, codec metadata, core bytecode, duplicate entries, legal notices, and active branding.
 
-The release pipeline requires **77 automated tests per target**, artifact verification, and localhost server/protocol probes for every asset before publication. The ray arithmetic change is checked against the original over 25,000 random cases and boundary cases; this is not a claim of measured global TPS improvement.
+The release pipeline requires **77 automated tests**, artifact verification, an API link check and localhost server/protocol probes on **every supported Paper version** with the same JAR before publication. The ray arithmetic change is checked against the original over 25,000 random cases and boundary cases; this is not a claim of measured global TPS improvement.
 
 </details>
 

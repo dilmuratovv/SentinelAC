@@ -13,6 +13,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--target', required=True)
 parser.add_argument('--java', required=True)
 parser.add_argument('--jar', type=Path)
+parser.add_argument('--unit-tests', type=Path, help='unit-tests.json written by the build job (default: read plugin/target/surefire-reports)')
 parser.add_argument('--mode', choices=['native', 'via', 'both'], default='both')
 parser.add_argument('--accept-eula', action='store_true')
 parser.add_argument('--client-probes', action='store_true')
@@ -20,7 +21,8 @@ args = parser.parse_args()
 if not args.accept_eula:
     parser.error('Accept the Minecraft EULA to run isolated test servers')
 entry = next(x for x in json.loads(Path('tools/server-matrix.json').read_text())['servers'] if x['version'] == args.target)
-jar = args.jar or Path(f'plugin/target/SentinelAC-2.6.0-paper{args.target}.jar')
+version = json.loads(Path('release.json').read_text())['version']
+jar = args.jar or Path(f'plugin/target/SentinelAC-{version}-paper.jar')
 folder = Path('target/test-dependencies'); folder.mkdir(parents=True, exist_ok=True)
 artifacts = download(folder, keys={'viaversion','viabackwards'})
 paper = folder / entry['filename']
@@ -42,8 +44,11 @@ report = {'target': args.target, 'paper_build': entry['build'], 'paper_channel':
           'native_client_probes': any(case['mode'] == 'native' and case['client_probes'] for case in cases),
           'cases': cases,
           'translated_client_probes': args.client_probes and args.mode in ('via', 'both'), 'result': 'passed'}
-suites = [ET.parse(path).getroot() for path in Path('plugin/target/surefire-reports').glob('TEST-*.xml')]
-report['unit_tests'] = {key: sum(int(suite.get(key, 0)) for suite in suites) for key in ['tests', 'failures', 'errors', 'skipped']}
+if args.unit_tests:
+    report['unit_tests'] = json.loads(args.unit_tests.read_text())
+else:
+    suites = [ET.parse(path).getroot() for path in Path('plugin/target/surefire-reports').glob('TEST-*.xml')]
+    report['unit_tests'] = {key: sum(int(suite.get(key, 0)) for suite in suites) for key in ['tests', 'failures', 'errors', 'skipped']}
 assert report['unit_tests']['tests'] >= 77 and all(report['unit_tests'][key] == 0 for key in ['failures','errors','skipped'])
 (root / 'verification.json').write_text(json.dumps(report, indent=2)+'\n')
 print('TARGET PASSED: '+args.target, flush=True)

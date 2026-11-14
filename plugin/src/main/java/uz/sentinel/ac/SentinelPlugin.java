@@ -22,7 +22,7 @@ public final class SentinelPlugin extends SentinelACBukkitLoaderPlugin {
     @Override public void onEnable() {
         try {
             if (!uz.sentinel.ac.compatibility.ServerCompatibility.supports(Bukkit.getMinecraftVersion())) {
-                throw new IllegalStateException("This JAR targets Paper " + uz.sentinel.ac.compatibility.ServerCompatibility.target() + "; found " + Bukkit.getMinecraftVersion());
+                throw new IllegalStateException("This JAR supports Paper " + uz.sentinel.ac.compatibility.ServerCompatibility.range() + "; found " + Bukkit.getMinecraftVersion());
             }
             saveDefaultConfig();
             settings = readSettings();

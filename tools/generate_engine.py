@@ -11,9 +11,9 @@ import shutil
 import subprocess
 import sys
 
-TARGET = sys.argv[1] if len(sys.argv) > 1 else "26.2"
-VERSION = sys.argv[2] if len(sys.argv) > 2 else "2.6.0"
-JAVA = sys.argv[3] if len(sys.argv) > 3 else "25"
+TARGET = sys.argv[1] if len(sys.argv) > 1 else "1.21-26.3"
+VERSION = sys.argv[2] if len(sys.argv) > 2 else "2.7.0"
+JAVA = sys.argv[3] if len(sys.argv) > 3 else "21"
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "plugin/target/generated-sources/engine"
 RES = ROOT / "plugin/target/generated-resources/engine"
@@ -187,7 +187,7 @@ def main():
                         '    - "/sac help')
     messages.write_text(text)
     (RES / "sentinelac.properties").write_text(
-        f"build.version={VERSION}-paper{TARGET}\nbuild.target={TARGET}\nbuild.java={JAVA}\ngit.commit=unknown\ngit.branch=standalone\n"
+        f"build.version={VERSION}\nbuild.target={TARGET}\nbuild.java={JAVA}\ngit.commit=unknown\ngit.branch=standalone\n"
         "git.org=dilmuratovv\ngit.repo=SentinelAC\nbuild.shade_pe=true\n"
         "build.relocate=true\nbuild.release=false\ntimestamp=2026-10-29T00:00:00Z\n")
     legal = RES / "META-INF"

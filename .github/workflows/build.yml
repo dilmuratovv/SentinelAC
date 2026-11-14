@@ -1,4 +1,4 @@
-name: Version-specific Paper builds
+name: Build, verify and release the single Paper JAR
 on:
   push:
     branches: [main]
@@ -12,6 +12,43 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  # One JAR, compiled once against the oldest supported Paper API (1.21, Java 21 bytecode).
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Compile and test
+        run: mvn -B -ntp clean verify
+      - name: Inspect identity, resources and bytecode
+        run: python3 tools/verify_artifact.py
+      - name: Summarize unit tests
+        run: python3 tools/unit_test_summary.py plugin/target/unit-tests.json
+      - name: Extract the platform API the JAR links against
+        run: python3 tools/api_compat.py --extract-only --jar plugin/target/SentinelAC-*-paper.jar --refs-cache plugin/target/api-refs.tsv
+      - name: Collect the release candidate
+        run: |
+          mkdir -p dist
+          cp plugin/target/SentinelAC-*-paper.jar plugin/target/unit-tests.json plugin/target/api-refs.tsv dist/
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: SentinelAC-jar
+          path: dist/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: unit-test-reports
+          path: plugin/target/surefire-reports/*.txt
+          if-no-files-found: warn
   matrix:
     runs-on: ubuntu-latest
     outputs:
@@ -35,12 +72,13 @@ jobs:
           previous = subprocess.run(['git', 'show', 'HEAD^:release.json'], text=True, capture_output=True, check=False)
           prior = json.loads(previous.stdout) if previous.returncode == 0 else {}
           release_changed = (current['version'], current['tag']) != (prior.get('version'), prior.get('tag'))
-          publish = os.environ['GITHUB_EVENT_NAME'] == 'push' and os.environ['GITHUB_REF'] == 'refs/heads/main' and release_changed
+          publish = os.environ['GITHUB_REF'] == 'refs/heads/main' and ((os.environ['GITHUB_EVENT_NAME'] == 'push' and release_changed) or os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write('targets=' + json.dumps(targets) + '\n')
               output.write('publish=' + str(publish).lower() + '\n')
+  # The same JAR must link against and boot on every supported Paper version.
   verify:
-    needs: matrix
+    needs: [matrix, build]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
@@ -51,7 +89,6 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
-          submodules: recursive
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: temurin
@@ -60,41 +97,41 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Compile and test the exact target
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: SentinelAC-jar
+          path: dist
+      - name: Check the JAR links against Paper ${{ matrix.target }}
         env:
           TARGET: ${{ matrix.target }}
-        run: mvn -B -ntp -Ppaper-$TARGET clean verify
-      - name: Inspect target identity, resources and bytecode
-        env:
-          TARGET: ${{ matrix.target }}
-        run: python3 tools/verify_artifact.py "plugin/target/SentinelAC-2.6.0-paper$TARGET.jar"
+        run: |
+          mvn -B -ntp -q -f tools/api-classpath/pom.xml dependency:build-classpath -Dpaper.version="$(python3 tools/paper_version.py 1.21)" -Dmdep.outputFile="$PWD/baseline.txt"
+          mvn -B -ntp -q -f tools/api-classpath/pom.xml dependency:build-classpath -Dpaper.version="$(python3 tools/paper_version.py "$TARGET")" -Dmdep.outputFile="$PWD/target.txt"
+          python3 tools/api_compat.py --jar dist/SentinelAC-*-paper.jar --refs-cache dist/api-refs.tsv --java "$JAVA_HOME/bin/java" --baseline-classpath "$(cat baseline.txt)" --classpath "$(cat target.txt)"
       - run: npm ci --prefix tools/client --no-audit --no-fund
       - name: Verify isolated native and Via servers
         env:
           TARGET: ${{ matrix.target }}
-        run: python3 tools/smoke_target.py --target "$TARGET" --java "$JAVA_HOME/bin/java" --accept-eula --client-probes
-      - name: Collect the version-specific release candidate
+        run: python3 tools/smoke_target.py --target "$TARGET" --jar dist/SentinelAC-*-paper.jar --unit-tests dist/unit-tests.json --java "$JAVA_HOME/bin/java" --accept-eula --client-probes
+      - name: Collect the verification report
         env:
           TARGET: ${{ matrix.target }}
         run: |
-          mkdir -p dist
-          cp "plugin/target/SentinelAC-2.6.0-paper$TARGET.jar" dist/
-          cp "target/matrix-smoke/$TARGET/verification.json" "dist/verification-paper$TARGET.json"
+          mkdir -p report
+          cp "target/matrix-smoke/$TARGET/verification.json" "report/verification-paper$TARGET.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: SentinelAC-paper-${{ matrix.target }}
-          path: dist/
+          name: verification-paper-${{ matrix.target }}
+          path: report/
           if-no-files-found: error
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: validation-paper-${{ matrix.target }}
-          path: |
-            plugin/target/surefire-reports/*.txt
-            target/matrix-smoke/${{ matrix.target }}/**/smoke-output.log
+          path: target/matrix-smoke/${{ matrix.target }}/**/smoke-output.log
           if-no-files-found: warn
   publish:
-    needs: [matrix, verify]
+    needs: [matrix, build, verify]
     if: needs.matrix.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -105,9 +142,15 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          pattern: SentinelAC-paper-*
+          name: SentinelAC-jar
+          path: jar
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: verification-paper-*
           path: release-assets
           merge-multiple: true
+      - name: Gather the JAR
+        run: cp jar/SentinelAC-*-paper.jar release-assets/
       - name: Publish only after every target passed
         env:
           GH_TOKEN: ${{ github.token }}

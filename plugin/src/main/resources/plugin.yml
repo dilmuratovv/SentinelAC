@@ -1,5 +1,5 @@
 name: SentinelAC
-version: '${project.version}-paper${sentinel.target}'
+version: '${project.version}'
 main: uz.sentinel.ac.SentinelPlugin
 description: Standalone prediction anticheat and server policies for supported Paper servers
 authors: [azicoo]

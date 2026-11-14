@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check standalone layout, templates, legal notices and active branding."""
 import hashlib
+import json
 import struct
 import sys
 import zipfile
@@ -24,19 +25,24 @@ def utf8_constants(data):
         index += 1
     return values
 
-path = Path(sys.argv[1] if len(sys.argv) > 1 else 'plugin/target/SentinelAC-2.6.0-paper26.2.jar')
+ROOT = Path(__file__).resolve().parents[1]
+VERSION = json.loads((ROOT / 'release.json').read_text())['version']
+MATRIX = [server['version'] for server in json.loads((ROOT / 'tools/server-matrix.json').read_text())['servers']]
+path = Path(sys.argv[1] if len(sys.argv) > 1 else f'plugin/target/SentinelAC-{VERSION}-paper.jar')
 with zipfile.ZipFile(path) as jar:
     names = jar.namelist()
     assert len(names) == len(set(names)), 'Duplicate archive entries'
     assert not any(name.startswith(('ac/grim/', 'org/bukkit/', 'io/papermc/')) for name in names), 'Bundled old engine/server classes'
     plugin = jar.read('plugin.yml').decode()
     target_properties = dict(line.split('=', 1) for line in jar.read('sentinel-target.properties').decode().splitlines() if '=' in line)
-    target = target_properties['minecraft.version']
+    supported = target_properties['minecraft.versions'].split(',')
     java = int(target_properties['java.version'])
+    assert supported == MATRIX, 'Supported versions differ from tools/server-matrix.json'
+    target = supported[0]  # compiled against the oldest supported API
     assert target_properties['api.version'] == target
     assert f"api-version: '{target}'" in plugin
-    assert f"version: '2.6.0-paper{target}'" in plugin
-    assert path.name == f'SentinelAC-2.6.0-paper{target}.jar', 'Incorrect target filename'
+    assert f"version: '{VERSION}'" in plugin
+    assert path.name == f'SentinelAC-{VERSION}-paper.jar', 'Incorrect filename'
     expected_major = java + 44
     assert '\ndepend:' not in plugin, 'Unexpected mandatory external engine'
     assert '${' not in plugin, 'Unfiltered plugin version'
@@ -69,5 +75,5 @@ with zipfile.ZipFile(path) as jar:
             leftovers.append(name)
     assert core_classes >= 949, 'Engine/API source classes missing'
     assert not leftovers, 'Old active branding: ' + ', '.join(leftovers[:30])
-print(f'PASS: standalone source engine, complete templates, Sentinel branding, Java {java}, Paper {target}; {core_classes} core classes')
+print(f'PASS: standalone source engine, complete templates, Sentinel branding, Java {java} bytecode, Paper {supported[0]}-{supported[-1]}; {core_classes} core classes')
 print('SHA256 ' + hashlib.sha256(path.read_bytes()).hexdigest())

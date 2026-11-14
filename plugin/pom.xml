@@ -4,7 +4,7 @@
   <parent>
     <groupId>uz.sentinel.ac</groupId>
     <artifactId>sentinel-parent</artifactId>
-    <version>2.6.0</version>
+    <version>2.7.0</version>
   </parent>
   <artifactId>SentinelAC</artifactId>
   <dependencies>
@@ -124,7 +124,7 @@
     </dependency>
   </dependencies>
   <build>
-    <finalName>SentinelAC-${project.version}-paper${sentinel.target}</finalName>
+    <finalName>SentinelAC-${project.version}-paper</finalName>
     <resources>
       <resource>
         <directory>src/main/resources</directory>
@@ -150,7 +150,7 @@
               <executable>python3</executable>
               <arguments>
                 <argument>${project.basedir}/../tools/generate_engine.py</argument>
-                <argument>${sentinel.target}</argument>
+                <argument>${sentinel.range}</argument>
                 <argument>${project.version}</argument>
                 <argument>${maven.compiler.release}</argument>
               </arguments>
