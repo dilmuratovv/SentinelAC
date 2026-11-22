@@ -9,6 +9,7 @@ A Minecraft anticheat project by **azicoo**, built around server-side prediction
 [![Build](https://github.com/dilmuratovv/SentinelAC/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/dilmuratovv/SentinelAC/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/dilmuratovv/SentinelAC?color=ec4899&label=release)](https://github.com/dilmuratovv/SentinelAC/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Paper](https://img.shields.io/badge/paper-1.21%20%E2%80%93%2026.3-0ea5e9.svg)](#compatibility)
 [![Author](https://img.shields.io/badge/author-azicoo-8b5cf6.svg)](https://github.com/dilmuratovv/SentinelAC)
 
 [Download](https://github.com/dilmuratovv/SentinelAC/releases) · [Installation](#installation) · [Commands](#commands) · [Compatibility](#compatibility) · [Validation](docs/VALIDATION.md)
@@ -23,7 +24,23 @@ SentinelAC combines a prediction-based anticheat engine with server policy contr
 
 The JAR is compiled once against the oldest supported Paper API; CI then links it against, and boots it on, every supported version before a release is published. The engine is included in the JAR.
 
+It is part of the [Sentinel suite](#sentinel-suite).
+
 **Created and maintained by azicoo.**
+
+## Sentinel suite
+
+Five plugins by **azicoo**, each with its own repository and release. Every one works on its own.
+
+| Plugin | What it does |
+|---|---|
+| [SentinelAC](https://github.com/dilmuratovv/SentinelAC) | Anticheat: prediction-based movement, combat and packet checks. |
+| [SentinelAD](https://github.com/dilmuratovv/SentinelAD) | Anti-dupe: a global item ledger that removes duplicated items. |
+| [SentinelAE](https://github.com/dilmuratovv/SentinelAE) | Anti-ESP: hidden players and armor stands are never sent to the client. |
+| [SentinelAX-ray](https://github.com/dilmuratovv/SentinelAX-ray) | Anti-xray: Paper's native engine set up per world, plus mining analysis. |
+| [SentinelGuard](https://github.com/dilmuratovv/SentinelGuard) | Moderation: bans, mutes, history, `/sus`; collects the flags of AC, AD and AX-ray. |
+
+Together: SentinelGuard adds the findings of SentinelAC, SentinelAD and SentinelAX-ray to `/sus`, and `/sg status` shows the state of SentinelAE and SentinelAX-ray. All five are GPL-3.0 and run on Paper 1.21 to 26.3 with one JAR each (SentinelGuard also has a Velocity JAR).
 
 ## Features
 
@@ -182,6 +199,10 @@ Pass `--accept-eula` only after accepting the [Minecraft EULA](https://www.minec
 - [ ] Extend coverage as further Paper versions become available.
 - [ ] Expand client-version and gameplay compatibility testing.
 - [ ] Profile sustained load and test against a broader controlled cheat-client suite.
+
+## Releases
+
+Each release contains `SentinelAC-<version>-paper.jar`, `SHA256SUMS.txt` and `VERIFICATION.json` (the build and per-version test report produced by CI). Check the JAR with `sha256sum -c SHA256SUMS.txt`.
 
 ## Credits & license
 
