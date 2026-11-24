@@ -8,9 +8,11 @@ mod-sentinel:
   enabled: true
   kick-on-detect: true
   join-check-delay-ticks: 10
-  # Exact identifiers/namespaces, never substrings. Not a full mod inventory.
-  blacklisted-channels: ['baritone:channel', 'freecam:sync']
-  blacklisted-namespaces: [baritone, freecam, xaerominimap, xaeroworldmap, tweakeroo, meteor, wurst, liquidbounce]
+  # Exact identifiers/namespaces, never substrings. Not a full mod inventory: cheat clients can hide channels, so
+  # this only stops clients that announce themselves. Only automation/cheat namespaces are listed by default;
+  # minimaps (xaerominimap, xaeroworldmap, journeymap) and tweak mods are allowed unless you add them here.
+  blacklisted-channels: ['baritone:channel']
+  blacklisted-namespaces: [baritone, meteor-client, meteor, wurst, liquidbounce, aristois, impact, futureclient, rusherhack, thunderhack, freecam]
 exploits:
   crystal-limiter:
     enabled: true
@@ -28,3 +30,53 @@ diagnostics:
   log-file-size-bytes: 5242880
   log-file-count: 3
 # Discord notifications are opt-in; diagnostics stay local.
+compatibility:
+  # Paper versions newer than the tested list are refused at startup. true starts anyway with a SEVERE warning
+  # (use only to stay protected until a new SentinelAC release; the engine may fail on unknown internals).
+  allow-untested-versions: false
+
+# ------------------------------------------------------------------ Sentinel combat checks
+# What happens on a flag is set in punishments.yml (groups KillAura, AimAssist, AuraTiming, Tracking, Backtrack, AutoClickerRate, AutoClickerPattern,
+# AutoTotem, CrystalAura). Permission sentinel.exempt.<checkname> exempts one player from one check.
+AutoClickerA:
+  # Attacks above this many per second (client ticks) are cancelled; exceeding it in 2 different seconds within
+  # 10 s flags. Fast legitimate butterfly/jitter clicking peaks around 15-20.
+  max-cps: 20
+AutoClickerB:
+  # Attacks per window and how many of their tick intervals must be identical (two fast windows in a row flag).
+  window: 40
+  min-same-interval: 0.95
+KillAuraA:
+  # Hits on different targets at least min-angle degrees apart within max-ticks client ticks; switches of them in
+  # 20 s flag (later such hits are cancelled).
+  min-angle: 90
+  max-ticks: 2
+  switches: 3
+KillAuraB:
+  # Combat yaw changes that fall between the player's own mouse-sensitivity steps (learned outside combat), out
+  # of the last 20.
+  required-of-20: 12
+  max-step-error: 0.15
+KillAuraC:
+  # Share of identical tick intervals among 20 hits 8-30 ticks apart that flags (a common interval of 4-7 ticks always needs 95 %).
+  min-same-interval: 0.8
+AutoTotemA:
+  # A totem refill whose first click comes within this many ms of the client seeing the pop counts as instant;
+  # 2 of the last 3 flag. People need 150 ms or more (real-client manual refill: ~350 ms); LiquidBounce's
+  # "human-like" Offhand starts after 50-100 ms.
+  max-reaction-ms: 120
+CrystalAuraA:
+  # A crystal broken within this many ms of the client seeing it, with no left click in the 150 ms before, counts
+  # as instant; required-of-8 of the last 8 breaks flag.
+  max-reaction-ms: 50
+  required-of-8: 6
+TrackingA:
+  # Correlation between the target's movement (as the client sees it) and the player's turning 0-1 tick later,
+  # over 200 fighting ticks. People need 2+ ticks to react: a person measured 0.07, LiquidBounce Aimbot 0.58.
+  min-correlation: 0.45
+  min-motion-degrees: 0.3
+BacktrackA:
+  # Fighting ping minus the player's own calm ping (400 fighting samples). Backtrack: +16 / +71 ms; a person in the
+  # same network conditions: -23 / -9 ms.
+  min-median-rise-ms: 8
+  min-upper-rise-ms: 50

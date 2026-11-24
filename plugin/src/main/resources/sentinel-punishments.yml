@@ -1,0 +1,199 @@
+# SentinelAC punishments — maximum enforcement, kicks only (default profile since 2.8.0)
+#
+# %check_name% check name, %description% check description, %vl% violations, %verbose% details, %player% player name
+# [alert] staff alert, [log] history entry, [webhook] Discord webhook (if configured), [proxy] other proxy servers
+#
+# "N:M command": runs at N active violations, then every M more (M = 0: only once at N). Active violations are
+# the ones inside remove-violations-after seconds. A check that is in no group is disabled.
+#
+# Every group kicks; nothing here bans. Thresholds were set against a real Minecraft client: with Meteor Client
+# every tested cheat module reached them, and real-client legit play (clicking up to ~17 CPS, sword fights, totem
+# refills, walking) raised no flag at all. Movement groups keep a margin for lag spikes, which the localhost bench
+# could not reproduce. On a server with many high-ping players, raise the movement numbers first.
+#
+# SentinelGuard collects every flag in /sus for staff review. Do not add "ban" lines here unless you want bans.
+
+Punishments:
+  # ---------------------------------------------------------------- movement (prediction engine)
+  Simulation:
+    remove-violations-after: 300
+    checks:
+      - "Simulation"
+      - "GroundSpoof"
+      - "Timer"
+      - "TimerLimit"
+      - "NoFall"
+    commands:
+      - "20:20 [alert]"
+      - "1:1 [log]"
+      - "40:40 [webhook]"
+      - "40:40 [proxy]"
+      - "80:0 kick %player% [Sentinel] Invalid movement."
+  Knockback:
+    remove-violations-after: 300
+    checks:
+      - "Knockback"
+      - "Explosion"
+    commands:
+      - "3:3 [alert]"
+      - "1:1 [log]"
+      - "10:10 [webhook]"
+      - "10:10 [proxy]"
+      - "30:0 kick %player% [Sentinel] Ignored knockback."
+  Misc:
+    remove-violations-after: 300
+    checks:
+      - "Vehicle"
+      - "NoSlow"
+      - "Sprint"
+      - "MultiActions"
+      - "Place"
+      - "Baritone"
+      - "Break"
+      - "TransactionOrder"
+      - "Elytra"
+      - "Chat"
+      - "Exploit"
+    commands:
+      - "5:5 [alert]"
+      - "1:1 [log]"
+      - "10:10 [webhook]"
+      - "10:10 [proxy]"
+      - "30:0 kick %player% [Sentinel] Illegal action (%check_name%)."
+  # ---------------------------------------------------------------- packets
+  Post:
+    remove-violations-after: 300
+    checks:
+      - "Post"
+    commands:
+      - "10:10 [alert]"
+      - "1:1 [log]"
+      - "20:20 [webhook]"
+      - "20:20 [proxy]"
+      - "60:0 kick %player% [Sentinel] Invalid packet order."
+  BadPackets:
+    remove-violations-after: 300
+    checks:
+      - "BadPackets"
+      - "PacketOrder"
+      - "Crash"
+    commands:
+      - "10:10 [alert]"
+      - "1:1 [log]"
+      - "20:20 [webhook]"
+      - "20:20 [proxy]"
+      - "40:0 kick %player% [Sentinel] Invalid packets."
+  # ---------------------------------------------------------------- combat (engine)
+  Reach:
+    remove-violations-after: 300
+    checks:
+      - "Reach"
+    commands:
+      - "1:1 [alert]"
+      - "1:1 [log]"
+      - "1:1 [webhook]"
+      - "1:1 [proxy]"
+      - "10:0 kick %player% [Sentinel] Reach."
+  Hitboxes:
+    remove-violations-after: 300
+    checks:
+      - "Hitboxes"
+    commands:
+      - "3:3 [alert]"
+      - "1:1 [log]"
+      - "3:3 [webhook]"
+      - "3:3 [proxy]"
+      - "20:0 kick %player% [Sentinel] Hit outside the hitbox."
+  Combat:
+    remove-violations-after: 300
+    checks:
+      - "Interact"
+      - "Aim"
+    commands:
+      - "5:10 [alert]"
+      - "1:1 [log]"
+      - "20:0 kick %player% [Sentinel] Invalid combat (%check_name%)."
+  # ---------------------------------------------------------------- Sentinel combat checks
+  # One flag of these already needs a repeated pattern (see the README), so two or three flags are strong evidence.
+  # Exact check names: the groups match by name.
+  KillAura:
+    remove-violations-after: 1800
+    checks:
+      - "KillAuraA"
+    commands:
+      - "1:1 [alert]"
+      - "1:1 [log]"
+      - "1:1 [webhook]"
+      - "1:1 [proxy]"
+      - "3:0 kick %player% [Sentinel] Combat cheat (multi-target aura)."
+  AimAssist:
+    remove-violations-after: 1800
+    checks:
+      - "KillAuraB"
+    commands:
+      - "1:1 [alert]"
+      - "1:1 [log]"
+      - "1:1 [webhook]"
+      - "2:0 kick %player% [Sentinel] Combat cheat (computed aim)."
+  AuraTiming:
+    remove-violations-after: 1800
+    checks:
+      - "KillAuraC"
+    commands:
+      - "1:1 [alert]"
+      - "1:1 [log]"
+      - "1:1 [webhook]"
+      - "2:0 kick %player% [Sentinel] Combat cheat (perfect hit timing)."
+  AutoClickerRate:
+    remove-violations-after: 300
+    checks:
+      - "AutoClickerA"
+    commands:
+      - "5:10 [alert]"
+      - "1:1 [log]"
+      - "30:0 kick %player% [Sentinel] Clicking faster than allowed."
+  AutoClickerPattern:
+    remove-violations-after: 1800
+    checks:
+      - "AutoClickerB"
+    commands:
+      - "1:1 [alert]"
+      - "1:1 [log]"
+      - "1:1 [webhook]"
+      - "2:0 kick %player% [Sentinel] Autoclicker."
+  AutoTotem:
+    remove-violations-after: 1800
+    checks:
+      - "AutoTotemA"
+    commands:
+      - "1:1 [alert]"
+      - "1:1 [log]"
+      - "1:1 [webhook]"
+      - "2:0 kick %player% [Sentinel] Auto totem."
+  Tracking:
+    remove-violations-after: 1800
+    checks:
+      - "TrackingA"
+    commands:
+      - "1:1 [alert]"
+      - "1:1 [log]"
+      - "1:1 [webhook]"
+      - "2:0 kick %player% [Sentinel] Combat cheat (aimbot)."
+  Backtrack:
+    remove-violations-after: 1800
+    checks:
+      - "BacktrackA"
+    commands:
+      - "1:1 [alert]"
+      - "1:1 [log]"
+      - "1:1 [webhook]"
+      - "3:0 kick %player% [Sentinel] Combat cheat (backtrack)."
+  CrystalAura:
+    remove-violations-after: 1800
+    checks:
+      - "CrystalAuraA"
+    commands:
+      - "1:1 [alert]"
+      - "1:1 [log]"
+      - "1:1 [webhook]"
+      - "2:0 kick %player% [Sentinel] Crystal aura."

@@ -1,8 +1,8 @@
 {
-  "version": "2.7.0",
-  "tag": "v2.7.0",
-  "name": "SentinelAC 2.7.0 — One JAR for Paper 1.21 to 26.3",
-  "notes": "docs/RELEASE-2.7.0.md",
+  "version": "2.8.0",
+  "tag": "v2.8.0",
+  "name": "SentinelAC 2.8.0 — combat checks and enforcing defaults",
+  "notes": "docs/RELEASE-2.8.0.md",
   "prerelease": false,
   "assets_directory": "release-assets"
 }

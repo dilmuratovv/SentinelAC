@@ -3,6 +3,8 @@ package uz.sentinel.ac;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
 import uz.sentinel.engine.platform.bukkit.SentinelACBukkitLoaderPlugin;
+import uz.sentinel.ac.compatibility.ServerCompatibility;
+import uz.sentinel.ac.config.PunishmentMigration;
 import uz.sentinel.ac.config.SentinelSettings;
 import uz.sentinel.ac.integration.EngineIntegration;
 import java.io.File;
@@ -21,10 +23,17 @@ public final class SentinelPlugin extends SentinelACBukkitLoaderPlugin {
 
     @Override public void onEnable() {
         try {
-            if (!uz.sentinel.ac.compatibility.ServerCompatibility.supports(Bukkit.getMinecraftVersion())) {
-                throw new IllegalStateException("This JAR supports Paper " + uz.sentinel.ac.compatibility.ServerCompatibility.range() + "; found " + Bukkit.getMinecraftVersion());
+            String version = Bukkit.getMinecraftVersion();
+            if (!ServerCompatibility.supports(version)) {
+                if (!ServerCompatibility.newerThanTested(version) || !allowUntestedVersions()) {
+                    throw new IllegalStateException("This JAR supports Paper " + ServerCompatibility.range() + "; found " + version
+                            + (ServerCompatibility.newerThanTested(version) ? " (compatibility.allow-untested-versions: true starts it anyway)" : ""));
+                }
+                getLogger().severe("Paper " + version + " is newer than every tested version (" + ServerCompatibility.range()
+                        + "). Starting anyway because compatibility.allow-untested-versions is true. Update SentinelAC as soon as a tested build exists.");
             }
             saveDefaultConfig();
+            migratePunishments();
             settings = readSettings();
             bridge = new SentinelBridge(this, settings);
             super.onEnable();
@@ -34,6 +43,25 @@ public final class SentinelPlugin extends SentinelACBukkitLoaderPlugin {
         } catch (Exception | LinkageError e) {
             getLogger().log(Level.SEVERE, "Sentinel startup failed; protection is NOT ready", e);
             getServer().getPluginManager().disablePlugin(this);
+        }
+    }
+
+    private boolean allowUntestedVersions() {
+        File file = new File(getDataFolder(), "config.yml");
+        return file.isFile() && YamlConfiguration.loadConfiguration(file).getBoolean("compatibility.allow-untested-versions", false);
+    }
+
+    /** Older punishments.yml files have no group for the Sentinel checks, which would leave them disabled. */
+    private void migratePunishments() {
+        try (var input = getResource("sentinel-punishments.yml")) {
+            if (input == null) throw new IllegalStateException("sentinel-punishments.yml is missing from the JAR");
+            String bundled = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            var added = PunishmentMigration.migrate(new File(getDataFolder(), "punishments.yml").toPath(), bundled,
+                    "before-" + getPluginMeta().getVersion());
+            if (!added.isEmpty()) getLogger().info("punishments.yml: added groups " + added + " for the new Sentinel checks (backup kept).");
+        } catch (Exception e) {
+            getLogger().log(Level.WARNING, "Could not add the Sentinel check groups to punishments.yml; add them by hand"
+                    + " from the default profile, otherwise those checks stay disabled: " + e.getMessage());
         }
     }
 

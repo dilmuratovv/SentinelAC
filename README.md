@@ -48,6 +48,7 @@ Together: SentinelGuard adds the findings of SentinelAC, SentinelAD and Sentinel
 |---|---|
 | **Movement prediction** | Server-side movement simulation, with checks for impossible movement, timing, and velocity behavior. |
 | **Combat & packets** | Reach, hitbox, knockback, packet-order, and malformed-packet checks from the integrated engine. |
+| **Sentinel combat checks** | Packet-level checks the upstream engine does not have: attack-rate limit and machine-regular clicking (autoclicker), fast multi-target switching and off-sensitivity combat aim (aura), ping-independent reaction timing for auto-totem and crystal aura. |
 | **Channel blacklist** | Configurable exact-channel and namespace rules, checked on join and later channel registrations, with optional kicks. |
 | **Action limits** | Sliding-window crystal and respawn-anchor policies, including a shared crystal budget for both hands. |
 | **Staff tools** | Alerts, profiles, recent findings, persistent history, prediction timing, and configuration reloads. |
@@ -106,7 +107,7 @@ For protocol translation, install the compatible **ViaVersion and ViaBackwards p
 
 ## Compatibility
 
-Release **2.7.0** is a single JAR, `SentinelAC-2.7.0-paper.jar`, for these exact Paper versions. Each one is covered by an API link check, native and Via server probes and the unit tests before publication.
+Release **2.8.0** is a single JAR, `SentinelAC-2.8.0-paper.jar`, for these exact Paper versions. Each one is covered by an API link check, native and Via server probes and the unit tests before publication.
 
 | Paper version | Java (needed by the server) | Tested Paper build/channel |
 |---|---|---|
@@ -138,11 +139,32 @@ See [Validation](docs/VALIDATION.md) and the release's `VERIFICATION.json` for e
 
 - **Channel rules:** Match exact identifiers or namespaces. A matching advertised channel can trigger a kick. Clients can hide channels, so this feature is not a complete inventory of installed mods.
 - **Action limits:** Excess crystal or anchor actions are cancelled according to server policy. Exceeding a rate limit alone is not proof of cheating.
-- **Punishments:** An [optional kick-oriented profile](deployment/SentinelAC/punishments.yml) is provided for staging and calibration. It is not installed automatically and does not apply permanent bans.
+- **Punishments:** Since 2.8.0 the default `punishments.yml` is a maximum-enforcement, kicks-only profile: every group kicks (movement 80, knockback 30, invalid packets 40, packet order 60, reach 10, hitboxes 20, other illegal actions 30, the Sentinel combat checks after 2–3 flags) and nothing bans. `Reach.enable-post-packet` is on by default. Upgrading servers keep their own file: the groups for the new checks are appended to it once (backup `punishments.yml.before-2.8.0.bak`), because a check that is in no group stays disabled.
+- **Untested Paper versions:** a Paper release newer than the tested list is refused, unless `compatibility.allow-untested-versions: true` (SEVERE warning at startup).
 - **Reloads:** Invalid Sentinel policy settings are rejected before application. Diagnostic buffer/log-size changes require a restart; inspect the console if an engine subsystem fails to reload.
 - **Diagnostics:** Logs rotate by size and count. Debug dumps remain on the server. Webhooks are disabled by default, and no bStats or upstream update/paste requests are started by SentinelAC.
 
 Test new builds and punishment thresholds on a staging server with your plugin set. Detection coverage and resource use depend on gameplay, network conditions, and configuration; zero lag, zero false positives, and universal cheat detection are not guaranteed.
+
+## Sentinel combat checks (2.8.0)
+
+All of them run inside the engine on the packet thread, use client ticks or transaction timing instead of wall time where possible, and need a repeated pattern before a single flag. Thresholds are in `config.yml` under each check name; `sentinel.exempt.<check>` exempts one player.
+
+| Check | What it catches | Flags when | Default action |
+|---|---|---|---|
+| `AutoClickerA` | Attack spam above a CPS limit | More than `max-cps` (20) attacks within 20 client ticks, in 2 different seconds within 10 s. Attacks above the limit are always cancelled. | alert, kick at 30 |
+| `AutoClickerB` | Fixed-delay autoclickers | Two windows of 40 attacks in a row, both faster than ~7 CPS and with 95 % identical tick intervals | alert, kick at 2 |
+| `KillAuraA` | Multi-target / switch aura | Hits on different targets ≥ 90° apart within 2 client ticks, 3 times in 20 s; later such hits are cancelled | alert, kick at 3 |
+| `KillAuraB` | Aim computed by a cheat during combat (single-target aura, aim assist) | 12 of the last 20 combat yaw changes fall between the player's own mouse-sensitivity steps, learned outside combat and only trusted when ≥ 90 % of the player's own rotations are whole steps (trackpads, zoom and cinematic camera are never judged) | alert, kick at 2 |
+| `KillAuraC` | Cooldown-paced auras, trigger bots and slow autoclickers (machine-perfect hit timing) | 20 hits 4–30 ticks apart with ≥ 80 % identical intervals (≥ 95 % when the common interval is 4–7 ticks) | alert, kick at 2 |
+| `TrackingA` | Aimbot / aura tracking | The player's yaw follows the target's movement (as the client sees it) within 0–1 client tick: correlation ≥ 0.45 over 200 fighting ticks and 0.1 stronger than at a human reaction lag (3–5 ticks). Ping-independent | alert, kick at 2 |
+| `BacktrackA` | Backtrack (holding incoming packets while fighting) | The player's own ping while fighting is ≥ 8 ms (median) and ≥ 50 ms (75th percentile) above their own calm ping, over 400 fighting samples | alert, kick at 3 |
+| `AutoTotemA` | Auto totem | The first click/swap after a totem pop comes ≤ 120 ms after the client saw the pop (ping-independent), 2 of the last 3 pops | alert, kick at 2 |
+| `CrystalAuraA` | Crystal aura | 6 of the last 8 crystals broken ≤ 50 ms after the client saw them, with no left click in the 150 ms before | alert, kick at 2 |
+
+`tools/combat_probe.py` runs these against a disposable localhost server with protocol probe clients (`tools/client/combat.cjs`). `tools/realclient_probe.py` runs a **real Minecraft client with a cheat client mod** (Meteor Client) in a virtual display against a disposable server: modules are switched with the cheat client's own chat commands, and the legit baselines use real mouse and keyboard input (XTEST) through the genuine client. `-Dsentinel.trace=<dir>` (development only) records every rotation and attack for `tools/analyze_trace.py`.
+
+Limits: AutoClickerB, KillAuraC, AutoTotemA's tick timing and CrystalAuraA's idle rule assume clients that send a packet every tick (1.21.2+ clients on 1.21.2+ servers, and 1.8). On older combinations AutoClickerA and KillAuraA fall back to wall time and AutoClickerB/KillAuraC are skipped. Cheats that randomise their hit timing AND correct their rotations to the sensitivity grid are much harder to see; tested with real clients, also behind a simulated network (120 ms and 250 ms round trip with jitter and lag spikes): Meteor Client (all tested modules caught) and LiquidBounce (KillAura, TriggerBot, AutoClicker, Aimbot, Backtrack, Reach, Hitbox, Criticals, Timer and the movement modules caught; TickBase, Offhand, Speed and KeepSprint not caught) — see docs/RELEASE-2.8.0.md.
 
 ## Build from source
 
@@ -156,15 +178,15 @@ mvn -B -ntp clean verify
 python3 tools/verify_artifact.py
 ```
 
-Output: `plugin/target/SentinelAC-2.7.0-paper.jar`. The build compiles against the Paper 1.21 API. The `paper-<version>` Maven profiles only select another API to check the JAR against, they do not produce a different JAR. Never install multiple Sentinel builds on the same server.
+Output: `plugin/target/SentinelAC-2.8.0-paper.jar`. The build compiles against the Paper 1.21 API. The `paper-<version>` Maven profiles only select another API to check the JAR against, they do not produce a different JAR. Never install multiple Sentinel builds on the same server.
 
 To check the JAR against another Paper version (JDK 25 for 26.x):
 
 ```sh
-python3 tools/api_compat.py --extract-only --jar plugin/target/SentinelAC-2.7.0-paper.jar --refs-cache refs.tsv
+python3 tools/api_compat.py --extract-only --jar plugin/target/SentinelAC-2.8.0-paper.jar --refs-cache refs.tsv
 mvn -B -ntp -q -f tools/api-classpath/pom.xml dependency:build-classpath -Dpaper.version=1.21-R0.1-SNAPSHOT -Dmdep.outputFile="$PWD/baseline.txt"
 mvn -B -ntp -q -f tools/api-classpath/pom.xml dependency:build-classpath -Dpaper.version="$(python3 tools/paper_version.py 26.3)" -Dmdep.outputFile="$PWD/target.txt"
-python3 tools/api_compat.py --jar plugin/target/SentinelAC-2.7.0-paper.jar --refs-cache refs.tsv --baseline-classpath "$(cat baseline.txt)" --classpath "$(cat target.txt)"
+python3 tools/api_compat.py --jar plugin/target/SentinelAC-2.8.0-paper.jar --refs-cache refs.tsv --baseline-classpath "$(cat baseline.txt)" --classpath "$(cat target.txt)"
 ```
 
 <details>
@@ -176,7 +198,7 @@ python3 tools/api_compat.py --jar plugin/target/SentinelAC-2.7.0-paper.jar --ref
 - `runtime/` extracts third-party libraries and protocol assets from a hash-verified distribution. Engine/API bytecode and the source-built shim are excluded from that carrier.
 - Artifact verification checks required resources, codec metadata, core bytecode, duplicate entries, legal notices, and active branding.
 
-The release pipeline requires **77 automated tests**, artifact verification, an API link check and localhost server/protocol probes on **every supported Paper version** with the same JAR before publication. The ray arithmetic change is checked against the original over 25,000 random cases and boundary cases; this is not a claim of measured global TPS improvement.
+The release pipeline requires **the automated tests**, artifact verification, an API link check and localhost server/protocol probes on **every supported Paper version** with the same JAR before publication. The ray arithmetic change is checked against the original over 25,000 random cases and boundary cases; this is not a claim of measured global TPS improvement.
 
 </details>
 
@@ -198,6 +220,7 @@ Pass `--accept-eula` only after accepting the [Minecraft EULA](https://www.minec
 - [x] Add independent build profiles and a gated server-test matrix for the published 1.21.x and 26.x targets.
 - [ ] Extend coverage as further Paper versions become available.
 - [ ] Expand client-version and gameplay compatibility testing.
+- [x] Add packet-level combat checks (autoclicker, aura, auto-totem, crystal aura) and enforcing default punishments.
 - [ ] Profile sustained load and test against a broader controlled cheat-client suite.
 
 ## Releases

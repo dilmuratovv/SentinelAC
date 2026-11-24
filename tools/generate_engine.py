@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 TARGET = sys.argv[1] if len(sys.argv) > 1 else "1.21-26.3"
-VERSION = sys.argv[2] if len(sys.argv) > 2 else "2.7.0"
+VERSION = sys.argv[2] if len(sys.argv) > 2 else "2.8.0"
 JAVA = sys.argv[3] if len(sys.argv) > 3 else "21"
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "plugin/target/generated-sources/engine"
@@ -29,6 +29,12 @@ LIBS = {
     "org.incendo": "incendo", "io.leangen.geantyref": "geantyref",
     "com.zaxxer": "zaxxer",
 }
+
+# Sentinel's own engine checks (tools/engine-additions), registered in CheckManager in this order.
+SENTINEL_CHECKS = ("AutoClickerA", "AutoClickerB", "KillAuraA", "KillAuraB", "KillAuraC", "AutoTotemA", "CrystalAuraA",
+                   "TrackingA", "BacktrackA")
+# Sentinel processors without punishments (diagnostics), registered after the checks.
+SENTINEL_PROCESSORS = ("SentinelTrace",)
 
 def brand(text):
     text = text.replace("ac/grim/grimac", "uz/sentinel/engine")
@@ -110,6 +116,13 @@ def customize(name, text):
         text = text[:text.index("    private static void tick() {")] + "    private static void tick() { requests.tick(); }\n    @Override public void stop() { requests.close(); }\n}\n"
         text = text.replace('validatedConfigURL("embed-footer-url", "https://github.com/dilmuratovv/SentinelAC")', 'validatedConfigURL("embed-footer-url", null)')
         text = text.replace('getStringElse("embed-image-url", defaultURL)', 'getStringElse(configPath, defaultURL)')
+    elif name == "CheckManager.java":
+        hitboxes = "                .put(Hitboxes.class, new Hitboxes(player)) // Hitboxes is invoked by Reach\n"
+        registered = "".join(
+            f"                .put(uz.sentinel.engine.checks.impl.sentinel.{check}.class, "
+            f"new uz.sentinel.engine.checks.impl.sentinel.{check}(player))\n"
+            for check in SENTINEL_CHECKS + SENTINEL_PROCESSORS)
+        text = replace_once(text, hitboxes, hitboxes + "                // Sentinel combat checks (tools/engine-additions)\n" + registered)
     elif name == "SimpleCollisionBox.java":
         text = replace_once(text,
             "Vector3dm invDir = new Vector3dm(1f / ray.direction().getX(), 1f / ray.direction().getY(), 1f / ray.direction().getZ());",
@@ -153,6 +166,19 @@ def main():
                 raise ValueError(f"Duplicate generated class {target}")
             target.write_text(customize(target.name, java_brand(path.read_text())), encoding="utf-8")
             count += 1
+    # Sentinel's own engine checks, written against the upstream names and branded like the pinned sources.
+    additions = ROOT / "tools/engine-additions"
+    for path in sorted(additions.rglob("*.java")):
+        relative = brand(path.relative_to(additions).as_posix().replace("/", ".")).replace(".", "/")
+        target = OUT / (relative.removesuffix("/java") + ".java")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            raise ValueError(f"Engine addition collides with a pinned class: {target}")
+        target.write_text(java_brand(path.read_text()), encoding="utf-8")
+        count += 1
+    for check in SENTINEL_CHECKS:
+        if not (OUT / f"uz/sentinel/engine/checks/impl/sentinel/{check}.java").exists():
+            raise SystemExit(f"Missing Sentinel check source: {check}")
     # Keep the pinned engine's concurrency, ownership and verbose-schema tests.
     folder = ROOT / "upstream/engine/common/src/test/java"
     for path in sorted(folder.rglob("*.java")):
@@ -175,10 +201,21 @@ def main():
     # One config contains both engine defaults and Sentinel policy settings.
     config = (RES / "config/en.yml").read_text()
     config = config[config.index("alerts:"):].replace("check-for-updates: true", "check-for-updates: false")
+    # Maximum-enforcement defaults: the upstream comment says the post packet catches more cheaters without false
+    # positives (costs a little bandwidth).
+    config = replace_once(config, "    enable-post-packet: false", "    enable-post-packet: true")
     custom = (ROOT / "plugin/src/main/resources/sentinel-defaults.yml").read_text()
     merged = "# SentinelAC configuration. Upstream attribution: META-INF/NOTICE.txt.\n" + config + "\n" + custom
     (RES / "config/en.yml").write_text(merged)
     (RES / "config.yml").write_text(merged)
+    # Sentinel's punishment profile (kicks for strong evidence, groups for the Sentinel checks) replaces the
+    # upstream alert-only defaults in every language.
+    profile = (ROOT / "plugin/src/main/resources/sentinel-punishments.yml").read_text()
+    for check in SENTINEL_CHECKS:
+        if f'"{check}"' not in profile:
+            raise SystemExit(f"sentinel-punishments.yml has no group for {check}: it would stay disabled")
+    for path in sorted((RES / "punishments").glob("*.yml")):
+        path.write_text(profile, encoding="utf-8")
     messages = RES / "messages/en.yml"
     text = messages.read_text().replace("Uploads a debug log", "Saves a local debug log")
     text = text.replace('    - "/sac help', '    - "/sac info &f- &7Build and policy status"\n'
@@ -198,7 +235,8 @@ def main():
                "GrimAPI source: https://github.com/GrimAnticheat/GrimAPI commit e9ae70ad6e13af0f3dab02ac849608443fb69f8a\n",
                "Thanks to DefineOutside and all upstream contributors.\n",
                "Modified source/build instructions: https://github.com/dilmuratovv/SentinelAC\n",
-               "Changes include source namespaces, commands, integration, bounded diagnostics/webhooks, and scalar ray arithmetic.\n\n",
+               "Changes include source namespaces, commands, integration, bounded diagnostics/webhooks, scalar ray arithmetic, "
+               "additional combat checks (autoclicker, aura, auto-totem, crystal aura) and a Sentinel punishment profile.\n\n",
                (ROOT / "upstream/engine/common/src/main/resources/config/en.yml").read_text().split("alerts:")[0]]
     (legal / "NOTICE.txt").write_text("".join(notices))
     for project in ("engine", "api"):
